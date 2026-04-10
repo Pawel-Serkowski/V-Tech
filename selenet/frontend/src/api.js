@@ -45,6 +45,10 @@ export function fetchQueueLoad() {
   return request("/api/packets/queue-load");
 }
 
+export function fetchNodes(limit = 200) {
+  return request(`/api/nodes?limit=${limit}`);
+}
+
 export function createPacket(packet) {
   return request("/api/packets", {
     method: "POST",
