@@ -1,0 +1,56 @@
+@import url("https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700&family=Space+Grotesk:wght@400;500;700&display=swap");
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg-top: #04131f;
+  --bg-middle: #0d2f3f;
+  --bg-bottom: #1b4550;
+  --panel: rgba(8, 31, 45, 0.84);
+  --stroke: rgba(118, 243, 255, 0.25);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  font-family: "Space Grotesk", sans-serif;
+  color: #e8fbff;
+  background:
+    radial-gradient(circle at 20% 10%, rgba(118, 243, 255, 0.22), transparent 38%),
+    radial-gradient(circle at 78% 15%, rgba(255, 176, 91, 0.18), transparent 35%),
+    radial-gradient(circle at 40% 85%, rgba(157, 247, 168, 0.1), transparent 34%),
+    linear-gradient(160deg, var(--bg-top), var(--bg-middle) 55%, var(--bg-bottom));
+}
+
+#root {
+  min-height: 100vh;
+}
+
+.grid-noise {
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+  background-size: 40px 40px;
+  pointer-events: none;
+}
+
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--stroke);
+  border-radius: 0.9rem;
+  box-shadow: 0 0 0 1px rgba(118, 243, 255, 0.18), 0 12px 30px rgba(0, 0, 0, 0.35);
+}
+
+.hud-title {
+  font-family: "Orbitron", sans-serif;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
