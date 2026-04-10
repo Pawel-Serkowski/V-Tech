@@ -4,7 +4,14 @@ import EventFeedPanel from "../components/EventFeedPanel";
 import PacketDispatchForm from "../components/PacketDispatchForm";
 import PacketTable from "../components/PacketTable";
 
-export default function DispatchPage({ onDispatch, packets, events, loadingPackets }) {
+export default function DispatchPage({
+  onDispatch,
+  packets,
+  events,
+  loadingPackets,
+  onCancelPacket,
+  cancellingPacketIds,
+}) {
   return (
     <>
       <CRow className="g-4 mb-2">
@@ -34,7 +41,12 @@ export default function DispatchPage({ onDispatch, packets, events, loadingPacke
 
       <CRow className="g-4 mt-1">
         <CCol xs={12}>
-          <PacketTable packets={packets.slice(0, 25)} loading={loadingPackets} />
+          <PacketTable
+            packets={packets.slice(0, 25)}
+            loading={loadingPackets}
+            onCancelPacket={onCancelPacket}
+            cancellingPacketIds={cancellingPacketIds}
+          />
         </CCol>
       </CRow>
     </>

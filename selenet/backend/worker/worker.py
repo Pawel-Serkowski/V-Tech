@@ -13,6 +13,10 @@ BACKEND_STATUS_URL = os.getenv(
     "BACKEND_STATUS_URL",
     "http://backend:8000/api/packets/status",
 )
+BACKEND_PACKETS_URL = os.getenv(
+    "BACKEND_PACKETS_URL",
+    "http://backend:8000/api/packets",
+)
 
 
 def _delay_seconds(priority: int | None) -> int:
@@ -58,6 +62,31 @@ async def _notify_backend(
         print(f"[worker] failed status callback for packet {packet_id}: {exc}")
 
 
+async def _is_cancel_requested(client: httpx.AsyncClient, packet_id: str) -> bool:
+    try:
+        response = await client.get(f"{BACKEND_PACKETS_URL}/{packet_id}", timeout=10.0)
+    except Exception as exc:
+        print(f"[worker] failed to read packet {packet_id}: {exc}")
+        return False
+
+    if response.status_code == 404:
+        return False
+
+    if response.status_code >= 400:
+        print(
+            f"[worker] unexpected status while reading packet {packet_id}: "
+            f"{response.status_code}"
+        )
+        return False
+
+    try:
+        packet_doc = response.json()
+    except Exception:
+        return False
+
+    return bool(packet_doc.get("cancel_requested", False))
+
+
 async def _process_message(message: aio_pika.IncomingMessage, client: httpx.AsyncClient) -> None:
     async with message.process(requeue=False):
         data = json.loads(message.body.decode("utf-8"))
@@ -91,6 +120,7 @@ async def _process_message(message: aio_pika.IncomingMessage, client: httpx.Asyn
             return
 
         total_hops = len(route_hops)
+        cancel_requested = await _is_cancel_requested(client, packet_id)
 
         for hop_index, to_node in enumerate(route_hops, start=1):
             from_node = source_node if hop_index == 1 else route_hops[hop_index - 2]
@@ -109,16 +139,27 @@ async def _process_message(message: aio_pika.IncomingMessage, client: httpx.Asyn
             )
 
             await asyncio.sleep(_delay_seconds(message.priority))
+            if await _is_cancel_requested(client, packet_id):
+                cancel_requested = True
 
         final_from = source_node if total_hops == 1 else route_hops[-2]
         final_to = route_hops[-1]
 
+        if not cancel_requested and await _is_cancel_requested(client, packet_id):
+            cancel_requested = True
+        final_status = "CANCELLED" if cancel_requested else "DELIVERED"
+        final_detail = (
+            f"Transmission simulation completed across {total_hops} hop(s), then marked as CANCELLED."
+            if cancel_requested
+            else f"Transmission simulation finished successfully across {total_hops} hop(s)."
+        )
+
         await _notify_backend(
             client=client,
             packet_id=packet_id,
-            status="DELIVERED",
+            status=final_status,
             next_hop=final_to,
-            detail=f"Transmission simulation finished successfully across {total_hops} hop(s).",
+            detail=final_detail,
             hop_index=total_hops,
             hop_total=total_hops,
             from_node=final_from,

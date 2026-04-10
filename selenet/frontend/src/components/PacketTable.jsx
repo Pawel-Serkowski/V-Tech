@@ -1,5 +1,6 @@
 import {
   CBadge,
+  CButton,
   CCard,
   CCardBody,
   CCardHeader,
@@ -22,6 +23,12 @@ function statusColor(status) {
   if (!status) {
     return "secondary";
   }
+  if (status.includes("CANCEL_REQUESTED")) {
+    return "warning";
+  }
+  if (status.includes("CANCELLED")) {
+    return "dark";
+  }
   if (status.includes("DELIVERED")) {
     return "success";
   }
@@ -32,6 +39,20 @@ function statusColor(status) {
     return "warning";
   }
   return "info";
+}
+
+function isTerminalStatus(status) {
+  if (!status) {
+    return false;
+  }
+
+  const normalized = status.toUpperCase();
+  return (
+    normalized.includes("DELIVERED")
+    || normalized.includes("FAILED")
+    || normalized.includes("ERROR")
+    || normalized.includes("CANCELLED")
+  );
 }
 
 function priorityColor(priority) {
@@ -59,7 +80,7 @@ function getLatestHopRow(packet) {
   return null;
 }
 
-export default function PacketTable({ packets, loading }) {
+export default function PacketTable({ packets, loading, onCancelPacket, cancellingPacketIds = [] }) {
   return (
     <CCard className="surface-card">
       <CCardHeader className="d-flex justify-content-between align-items-center flex-wrap gap-2">
@@ -95,11 +116,17 @@ export default function PacketTable({ packets, loading }) {
                   <CTableHeaderCell scope="col">Next Hop</CTableHeaderCell>
                   <CTableHeaderCell scope="col">Status</CTableHeaderCell>
                   <CTableHeaderCell scope="col">Earth Timestamp</CTableHeaderCell>
+                  <CTableHeaderCell scope="col">Action</CTableHeaderCell>
                 </CTableRow>
               </CTableHead>
               <CTableBody>
                 {packets.map((packet) => {
                   const latestHop = getLatestHopRow(packet);
+                  const hasCancelRequest = Boolean(packet.cancel_requested);
+                  const canCancel = !isTerminalStatus(packet.current_status)
+                    && !hasCancelRequest
+                    && typeof onCancelPacket === "function";
+                  const cancelInProgress = cancellingPacketIds.includes(packet.packet_id);
 
                   return (
                     <CTableRow key={packet.packet_id}>
@@ -122,6 +149,9 @@ export default function PacketTable({ packets, loading }) {
                       <CTableDataCell>{packet.next_hop || "unassigned"}</CTableDataCell>
                       <CTableDataCell>
                         <CBadge color={statusColor(packet.current_status)}>{packet.current_status}</CBadge>
+                        {hasCancelRequest && (
+                          <small className="d-block text-warning-emphasis mt-1">cancel requested</small>
+                        )}
                         {latestHop && (
                           <small className="d-block text-body-secondary mt-1 mono">
                             hop {latestHop.hop_index}/{latestHop.hop_total}
@@ -133,6 +163,23 @@ export default function PacketTable({ packets, loading }) {
                       </CTableDataCell>
                       <CTableDataCell className="text-body-secondary mono">
                         {packet.earth_timestamp}
+                      </CTableDataCell>
+                      <CTableDataCell>
+                        {canCancel ? (
+                          <CButton
+                            color="danger"
+                            size="sm"
+                            variant="outline"
+                            disabled={cancelInProgress}
+                            onClick={() => onCancelPacket(packet.packet_id)}
+                          >
+                            {cancelInProgress ? "Cancelling..." : "Cancel"}
+                          </CButton>
+                        ) : hasCancelRequest ? (
+                          <small className="text-warning-emphasis">Cancel requested</small>
+                        ) : (
+                          <small className="text-body-secondary">-</small>
+                        )}
                       </CTableDataCell>
                     </CTableRow>
                   );

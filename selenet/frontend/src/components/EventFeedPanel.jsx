@@ -1,5 +1,30 @@
 import { CBadge, CCard, CCardBody, CCardHeader, CListGroup, CListGroupItem } from "@coreui/react";
 
+function statusColor(status) {
+  if (!status) {
+    return "secondary";
+  }
+
+  const normalized = String(status).toUpperCase();
+
+  if (normalized.includes("CANCEL_REQUESTED")) {
+    return "warning";
+  }
+  if (normalized.includes("CANCELLED")) {
+    return "dark";
+  }
+  if (normalized.includes("DELIVERED")) {
+    return "success";
+  }
+  if (normalized.includes("ERROR") || normalized.includes("FAILED")) {
+    return "danger";
+  }
+  if (normalized.includes("WAITING")) {
+    return "warning";
+  }
+  return "info";
+}
+
 export default function EventFeedPanel({ events, title = "Realtime Event Feed" }) {
   return (
     <CCard className="surface-card h-100">
@@ -18,7 +43,7 @@ export default function EventFeedPanel({ events, title = "Realtime Event Feed" }
                   <div>
                     <span className="mono fw-semibold">{event.packet_id || "unknown-packet"}</span>
                     <span className="mx-2 text-body-secondary">{"->"}</span>
-                    <CBadge color="primary">{event.status || "unknown-status"}</CBadge>
+                    <CBadge color={statusColor(event.status)}>{event.status || "unknown-status"}</CBadge>
                     {typeof event.hop_index === "number" && typeof event.hop_total === "number" && (
                       <small className="text-body-secondary ms-2">
                         hop {event.hop_index}/{event.hop_total}

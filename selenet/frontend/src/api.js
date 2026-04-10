@@ -56,6 +56,12 @@ export function createPacket(packet) {
   });
 }
 
+export function cancelPacket(packetId) {
+  return request(`/api/packets/${packetId}/cancel`, {
+    method: "POST",
+  });
+}
+
 export function uploadNodesJson(nodes) {
   return request("/api/nodes", {
     method: "POST",

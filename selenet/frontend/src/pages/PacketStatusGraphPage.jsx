@@ -23,6 +23,7 @@ const STATUS_PRIORITY = [
   "QUEUED_ON_EARTH",
   "IN_TRANSIT",
   "WAITING_RETRY",
+  "CANCELLED",
   "DELIVERED",
   "FAILED",
   "ERROR",
@@ -58,7 +59,12 @@ function toMillis(value) {
 
 function isTerminalStatus(value) {
   const normalized = normalizeStatus(value);
-  return normalized === "DELIVERED" || normalized === "FAILED" || normalized === "ERROR";
+  return (
+    normalized === "DELIVERED"
+    || normalized === "FAILED"
+    || normalized === "ERROR"
+    || normalized === "CANCELLED"
+  );
 }
 
 function derivePacketMeta(packet) {

@@ -56,6 +56,8 @@ async def ingest_packet(packet: PacketCreate) -> PacketAck:
         "priority": int(packet.priority),
         "payload": packet.payload,
         "earth_timestamp": earth_timestamp,
+        "cancel_requested": False,
+        "cancel_requested_at": None,
         "next_hop": next_hop,
         "route_hops": route_hops or [],
         "current_status": queue_status,
@@ -140,10 +142,26 @@ async def queue_load() -> list[QueueLoadItem]:
 async def register_status_update(update: PacketStatusUpdate) -> dict[str, Any]:
     db = get_database()
 
+    packet_row = await db.packets.find_one(
+        {"packet_id": update.packet_id},
+        {"_id": 0, "current_status": 1},
+    )
+    if packet_row is None:
+        raise HTTPException(status_code=404, detail="Packet not found.")
+
+    if packet_row.get("current_status") == "CANCELLED" and update.status != "CANCELLED":
+        return {
+            "accepted": False,
+            "ignored": "packet-cancelled",
+        }
+
     set_payload: dict[str, Any] = {
         "current_status": update.status,
         "updated_at": update.at,
     }
+    if update.status == "CANCELLED":
+        set_payload["cancel_requested"] = True
+        set_payload["cancel_requested_at"] = update.at
     if update.next_hop is not None:
         set_payload["next_hop"] = update.next_hop
     if update.to_node is not None:
@@ -191,3 +209,75 @@ async def register_status_update(update: PacketStatusUpdate) -> dict[str, Any]:
     )
 
     return {"accepted": True}
+
+
+@router.post("/{packet_id}/cancel")
+async def cancel_packet(packet_id: str):
+    db = get_database()
+    cancelled_at = datetime.now(timezone.utc)
+
+    packet_row = await db.packets.find_one(
+        {"packet_id": packet_id},
+        {"_id": 0, "current_status": 1, "cancel_requested": 1},
+    )
+
+    if packet_row is None:
+        raise HTTPException(status_code=404, detail="Packet not found.")
+
+    current_status = str(packet_row.get("current_status", "")).upper()
+    if current_status in {"DELIVERED", "FAILED", "ERROR", "CANCELLED"}:
+        raise HTTPException(
+            status_code=409,
+            detail=f"Packet is already terminal ({current_status}) and cannot be cancelled.",
+        )
+
+    if bool(packet_row.get("cancel_requested", False)):
+        return {
+            "status": "Cancellation already requested",
+            "packet_id": packet_id,
+        }
+
+    result = await db.packets.update_one(
+        {"packet_id": packet_id},
+        {
+            "$set": {
+                "cancel_requested": True,
+                "cancel_requested_at": cancelled_at,
+                "updated_at": cancelled_at,
+            },
+            "$push": {
+                "status_history": {
+                    "status": "CANCEL_REQUESTED",
+                    "at": cancelled_at,
+                    "detail": "Cancellation requested by operator.",
+                }
+            },
+        },
+    )
+
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Packet not found.")
+
+    await ws_manager.broadcast(
+        {
+            "kind": "packet-status",
+            "packet_id": packet_id,
+            "status": "CANCEL_REQUESTED",
+            "detail": "Cancellation requested by operator.",
+            "at": cancelled_at.isoformat(),
+        }
+    )
+    return {
+        "status": "Cancellation request received",
+        "packet_id": packet_id,
+    }
+
+
+@router.get("/{packet_id}", response_model=PacketSummary)
+async def get_packet(packet_id: str) -> PacketSummary:
+    db = get_database()
+    row = await db.packets.find_one({"packet_id": packet_id})
+    if row is None:
+        raise HTTPException(status_code=404, detail="Packet not found.")
+
+    return PacketSummary.model_validate(_serialize_packet(row))
