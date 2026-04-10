@@ -215,7 +215,7 @@ export default function App() {
               <CCardBody className="d-flex flex-column flex-lg-row justify-content-between align-items-start align-items-lg-center gap-3">
                 <div>
                   <p className="mb-1 text-body-secondary text-uppercase fw-semibold">Earth-Moon Gateway</p>
-                  <h1 className="dashboard-title mb-1">SELeNet IoT Operations Dashboard</h1>
+                  <h1 className="dashboard-title mb-1">selnet IoT Operations Dashboard</h1>
                   <p className="mb-0 text-body-secondary">
                     Monitor routing, dispatch packet traffic, and manage object definitions from dedicated views.
                   </p>

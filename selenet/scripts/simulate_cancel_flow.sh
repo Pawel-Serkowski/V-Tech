@@ -66,8 +66,8 @@ curl -sS -X POST "${API_BASE_URL}/api/nodes" \
         ]
       }
     ]
-  }' > /tmp/selenet-cancel-step1.json
-cat /tmp/selenet-cancel-step1.json
+  }' > /tmp/selnet-cancel-step1.json
+cat /tmp/selnet-cancel-step1.json
 
 echo
 echo "[2/6] Creating packet..."

@@ -1,99 +1,229 @@
-# SELeNet Monorepo
+# selnet Monorepo
 
-SELeNet is a skeleton implementation of an Earth-Moon Gateway Communication Routing simulation based on Delay-Tolerant Networking principles.
+selnet to symulacja routingu Earth-Moon Gateway oparta o DTN (Delay-Tolerant Networking).
+Projekt jest zrobiony jako zestaw uslug (frontend + backend + broker + workerzy), gdzie kazdy worker symuluje osobny wezel/satelite.
 
-## Included Services
-- `frontend`: React + CoreUI command dashboard
-- `backend`: FastAPI API gateway + CGR skeleton + websocket status stream
-- `worker_*`: decentralized space-link simulators (one queue consumer per `NODE_ID`)
-- `mongo`: packet history and node configuration storage
-- `rabbitmq`: priority queue broker
+## Szybki Start (najkrotsza sciezka)
 
-## Run
+1. Wejdz do katalogu projektu:
+
 ```bash
-cd selenet
+cd selnet
+```
+
+2. Uruchom wszystko (z budowaniem obrazow):
+
+```bash
 docker compose up --build
 ```
 
-## Endpoints
+3. Otworz:
+
 - Frontend: http://localhost:5173
-- Backend API docs: http://localhost:8000/docs (compat) or http://localhost:8001/docs
-- RabbitMQ Management: http://localhost:15672 (guest / guest)
+- Backend docs: http://localhost:8000/docs (kompat) lub http://localhost:8001/docs
+- RabbitMQ panel: http://localhost:15672 (guest/guest)
 
-## Key Backend Routes
-- `POST /api/packets` - ingest packet, persist on Earth, compute route plan (`route_hops`), enqueue to source node queue
-- `GET /api/packets` - list recent packets
-- `GET /api/packets/queue-load` - current queue load view (derived from stored packet statuses)
-- `POST /api/packets/status` - internal status callback (worker -> backend)
-- `POST /api/nodes` - upload node configs as JSON
-- `POST /api/nodes/upload-file` - upload node configs as JSON or YAML file
-- `GET /api/nodes` - list nodes
-- `WS /ws/status` - real-time status stream
+## Jak odpalic wszystkich workerow (dokladnie o to pytales)
 
-## Automatic Retry (WAITING_RETRY)
-- Backend runs a retry loop that periodically scans packets in `WAITING_RETRY`.
-- When a valid contact window appears, packet is automatically re-routed, switched to `QUEUED_ON_EARTH`, and published to RabbitMQ.
-- Retry loop is configurable via environment:
-	- `RETRY_SCAN_INTERVAL_SECONDS` (default `3` in compose)
-	- `RETRY_BATCH_SIZE` (default `200` in compose)
+Masz dwa najczestsze warianty:
 
-## Multi-Window Node Configuration
-- Sample config with multiple visibility windows:
-	- `simulations/nodes.multi-window.json`
+1. Caly stack w tle:
 
-Node schema supports optional directed links:
-- `links`: list of next-hop node IDs available from this node.
+```bash
+docker compose up -d --build
+```
 
-If `links` are omitted for a node, the router falls back to legacy behavior and considers all known nodes as candidates.
+2. Tylko backend + db + broker + wszystkie workery (bez frontendu):
 
-## Multi-Hop Routing and Telemetry
-- Backend computes full route plans as `route_hops` (for example: `RELAY_A -> RELAY_B -> DEST`).
-- Workers emit hop-by-hop `IN_TRANSIT` updates with:
-	- `hop_index`, `hop_total`
-	- `from_node`, `to_node`
-- Status updates can include optional hop location labels:
-	- `from_location`, `to_location`
-- Packet `status_history` now records traversal across intermediate satellites/relays.
+```bash
+docker compose up -d --build \
+	backend mongo rabbitmq \
+	worker_earth_gateway worker_sat_1 worker_sat_2 worker_lunar_gateway
+```
 
-## Decentralized Workers (Store-and-Forward)
-- Every worker instance consumes exactly one queue: `packets.<NODE_ID>`.
-- Initial enqueue target is the source node queue (`source_node`).
-- Worker flow per message:
-	1) consume from its own queue,
-	2) simulate exactly one hop delay,
-	3) publish remaining route to queue of next node.
-- Queue prefix is configurable via `PACKET_QUEUE_PREFIX` (default: `packets`).
+Sprawdzenie czy workerzy dzialaja:
 
-Current compose profile starts these sample instances:
-- `NODE_ID=EARTH_GATEWAY`
-- `NODE_ID=SAT_1`
-- `NODE_ID=SAT_2`
-- `NODE_ID=LUNAR_GATEWAY`
+```bash
+docker compose ps
+```
 
-For custom topologies, add more worker services with matching `NODE_ID` values used in node config.
+Podglad logow workerow:
 
-## Determining Satellite Location Immediately
-- Preferred: define `location_label` (or `orbit`) in node configuration for each node.
-- Runtime override: set `NODE_LOCATION` on a worker container for immediate instance labeling.
-- Backend stores per-route location map in `route_locations` and workers emit location-aware telemetry.
+```bash
+docker compose logs -f worker_earth_gateway worker_sat_1 worker_sat_2 worker_lunar_gateway
+```
 
-Upload example:
+Stop:
+
+```bash
+docker compose down
+```
+
+Pelne sprzatanie (wolumeny + osierocone kontenery):
+
+```bash
+docker compose down -v --remove-orphans
+```
+
+## Jak dodac nowego workera (nowa satelite)
+
+1. Dodaj nowa usluge worker w docker-compose.yml (najlatwiej skopiowac worker_sat_1).
+2. Ustaw:
+	 - NODE_ID: musi byc zgodny z node_id w konfiguracji nodow
+	 - NODE_LOCATION: etykieta lokalizacji (np. "L2 Transfer Arc")
+3. Odpal:
+
+```bash
+docker compose up -d --build <nazwa_nowej_uslugi>
+```
+
+Jesli NODE_ID nie pasuje do nodow wysylajacych pakiety, kolejka bedzie sie zapelniac, ale worker nie bedzie bral tych paczek.
+
+## Architektura i przeplyw danych
+
+1. Frontend wysyla POST /api/packets.
+2. Backend zapisuje pakiet i wylicza route_hops.
+3. Backend wrzuca wiadomosc do kolejki zrodla: packets.<source_node>.
+4. Worker z tym NODE_ID robi jeden hop i przekazuje dalej do kolejki kolejnego wezla.
+5. Statusy trafiaja do backendu przez POST /api/packets/status i przez WebSocket do UI.
+
+To jest model zdecentralizowany store-and-forward (jeden hop na instancje workera).
+
+## Jak poruszac sie po aplikacji (UI)
+
+Po wejciu na http://localhost:5173 masz 4 glowne widoki:
+
+1. Monitoring
+	 - tabela pakietow, statusy, queue load, event feed
+	 - tu najlatwiej diagnozowac czy pakiety utknely
+
+2. Dispatch
+	 - wysylanie nowych pakietow
+	 - wybierasz source_node, destination_node, priority, payload
+
+3. Graf Statusow
+	 - wizualizacja przejsc statusow i hopow dla wybranych pakietow
+
+4. Objects
+	 - definicja nodow (ground_station/satellite/relay)
+	 - links, contact_windows, orbit, location_label
+	 - bez poprawnych nodow routing nie bedzie dzialal
+
+## Jak poruszac sie po kodzie (mapa repo)
+
+- backend/app/main.py
+	- start FastAPI, lifecycle, podpiecie routerow
+
+- backend/app/api/packets.py
+	- ingest pakietow, queue-load, status callback, cancel
+
+- backend/app/api/nodes.py
+	- upload/lista konfiguracji nodow
+
+- backend/app/cgr.py
+	- wyliczanie route_hops na podstawie links + contact windows
+
+- backend/worker/worker.py
+	- logika jednego hopa, forwarding miedzy kolejkami packets.<NODE_ID>
+
+- frontend/src/pages
+	- glowna nawigacja UI (Monitoring, Dispatch, Graf Statusow, Objects)
+
+- scripts/simulate_cancel_flow.sh
+	- gotowy test flow z anulowaniem
+
+- scripts/simulate_retry_flow.sh
+	- test WAITING_RETRY -> QUEUED_ON_EARTH -> DELIVERED
+
+## Kluczowe endpointy backendu
+
+- POST /api/packets
+- GET /api/packets
+- GET /api/packets/queue-load
+- POST /api/packets/status
+- POST /api/packets/{packet_id}/cancel
+- POST /api/nodes
+- POST /api/nodes/upload-file
+- GET /api/nodes
+- WS /ws/status
+
+## Konfiguracja nodow (co musi byc ustawione)
+
+Node schema wspiera:
+
+- node_id
+- node_type: ground_station | satellite | relay
+- links: lista dozwolonych next-hop
+- contact_windows: okna lacznosci
+- orbit: etykieta orbity (fallback lokalizacji)
+- location_label: preferowana etykieta lokalizacji
+
+Przyklad uploadu:
+
 ```bash
 curl -X POST http://localhost:8000/api/nodes \
 	-H 'Content-Type: application/json' \
 	--data-binary @simulations/nodes.multi-window.json
 ```
 
-## Retry Simulation (End-to-End)
-Run automated simulation that forces `WAITING_RETRY`, opens windows, and verifies transition to `DELIVERED`:
+## Pozycja satelity - jak jest okreslana teraz
+
+Pozycja jest etykieta logiczna, nie obliczeniem 3D:
+
+1. Najpierw location_label z konfiguracji noda.
+2. Jesli brak, fallback na orbit.
+3. Worker moze nadpisac/dopelnic lokalizacje przez NODE_LOCATION.
+
+Efekt widac w telemetrii hopow: from_location -> to_location.
+
+## Retry i cancel (zachowanie)
+
+- Retry engine skanuje WAITING_RETRY i automatycznie ponawia wysylke,
+	gdy pojawi sie poprawne okno kontaktu.
+- Cancel jest finalizowany do CANCELLED po stronie backendu,
+	zeby pakiety nie wisialy jako QUEUED_ON_EARTH.
+- Queue-load nie liczy pakietow z cancel_requested=true.
+
+## Gotowe symulacje E2E
+
+Cancel flow:
+
+```bash
+chmod +x scripts/simulate_cancel_flow.sh
+./scripts/simulate_cancel_flow.sh
+```
+
+Retry flow:
 
 ```bash
 chmod +x scripts/simulate_retry_flow.sh
 ./scripts/simulate_retry_flow.sh
 ```
 
-## Notes
-- Frontend, backend, and worker are built from a single multi-stage Dockerfile: `selenet/Dockerfile`.
-- Priority queue uses RabbitMQ `x-max-priority`.
-- Worker simulates one transport hop per message and forwards packet envelopes between node queues.
-- `time_offset_seconds` is stored for demonstrations, while routing logic uses Earth baseline time.
+## Najczestsze problemy i szybka diagnoza
+
+1. "Requesty nie ida"
+	 - sprawdz backend na 8000/8001:
+
+```bash
+curl http://localhost:8000/api/health
+curl http://localhost:8001/api/health
+```
+
+2. "Pakiety stoja w kolejce"
+	 - sprawdz czy istnieje worker z NODE_ID rownym source_node lub kolejnemu hopowi
+	 - sprawdz logs workerow
+
+3. "Brak trasy"
+	 - sprawdz links i contact_windows w Objects
+	 - sprawdz czy source/destination istnieja w konfiguracji
+
+4. "Frontend pokazuje stare dane"
+	 - twarde odswiezenie strony
+	 - sprawdzenie websocketu /ws/status
+
+## Uwagi techniczne
+
+- Frontend, backend i worker korzystaja z jednego Dockerfile (multi-stage).
+- RabbitMQ ma kolejki priorytetowe x-max-priority.
+- Routing korzysta z czasu bazowego Earth.
