@@ -1,5 +1,16 @@
 import { useState } from "react";
 
+import {
+  CButton,
+  CCard,
+  CCardBody,
+  CCardHeader,
+  CForm,
+  CFormInput,
+  CFormLabel,
+  CFormTextarea,
+} from "@coreui/react";
+
 const TEMPLATE = `[
   {
     "node_id": "ESTRACK_PL",
@@ -65,39 +76,35 @@ export default function ConfigUploadPanel({ onUploadJson, onUploadFile }) {
   };
 
   return (
-    <section className="panel p-5">
-      <h2 className="hud-title text-sm text-oceanic-100">Node Configuration Upload</h2>
+    <CCard className="surface-card h-100">
+      <CCardHeader>
+        <h2 className="h6 mb-0">Node & Satellite Configuration</h2>
+        <small className="text-body-secondary">Load orbital windows and time offsets from JSON or YAML</small>
+      </CCardHeader>
+      <CCardBody className="d-flex flex-column gap-4">
+        <CForm className="d-flex flex-column gap-3" onSubmit={submitJson}>
+          <div>
+            <CFormLabel htmlFor="node-json">JSON Editor</CFormLabel>
+            <CFormTextarea
+              id="node-json"
+              rows={9}
+              value={text}
+              onChange={(event) => setText(event.target.value)}
+              className="mono"
+            />
+          </div>
+          <CButton type="submit" color="info" variant="outline">
+            Upload JSON
+          </CButton>
+        </CForm>
 
-      <form className="mt-4 space-y-3" onSubmit={submitJson}>
-        <label className="block text-xs uppercase tracking-wide text-oceanic-200">
-          JSON Editor
-        </label>
-        <textarea
-          className="h-44 w-full rounded-md border border-oceanic-300/30 bg-slate-950/50 p-3 text-xs text-oceanic-100 outline-none focus:border-solar-300"
-          value={text}
-          onChange={(event) => setText(event.target.value)}
-        />
-        <button
-          className="rounded-md border border-solar-300/60 bg-solar-300/20 px-3 py-2 text-sm font-semibold text-solar-100 hover:bg-solar-300/30"
-          type="submit"
-        >
-          Upload JSON
-        </button>
-      </form>
+        <div className="border-top pt-3">
+          <CFormLabel htmlFor="node-file">Upload JSON or YAML file</CFormLabel>
+          <CFormInput id="node-file" type="file" accept=".json,.yaml,.yml" onChange={submitFile} />
+        </div>
 
-      <div className="mt-5 border-t border-oceanic-300/20 pt-4">
-        <label className="block text-xs uppercase tracking-wide text-oceanic-200">
-          Upload JSON or YAML file
-        </label>
-        <input
-          accept=".json,.yaml,.yml"
-          className="mt-2 block w-full cursor-pointer rounded-md border border-oceanic-300/30 bg-slate-950/45 p-2 text-sm"
-          onChange={submitFile}
-          type="file"
-        />
-      </div>
-
-      {localError && <p className="mt-3 text-sm text-red-200">{localError}</p>}
-    </section>
+        {localError && <small className="text-danger">{localError}</small>}
+      </CCardBody>
+    </CCard>
   );
 }

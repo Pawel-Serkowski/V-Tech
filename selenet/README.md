@@ -3,7 +3,7 @@
 SELeNet is a skeleton implementation of an Earth-Moon Gateway Communication Routing simulation based on Delay-Tolerant Networking principles.
 
 ## Included Services
-- `frontend`: React + Tailwind command dashboard
+- `frontend`: React + CoreUI command dashboard
 - `backend`: FastAPI API gateway + CGR skeleton + websocket status stream
 - `worker`: space-link simulator consuming RabbitMQ priority queue
 - `mongo`: packet history and node configuration storage

@@ -1,89 +1,114 @@
+import {
+  CBadge,
+  CCard,
+  CCardBody,
+  CCardHeader,
+  CSpinner,
+  CTable,
+  CTableBody,
+  CTableDataCell,
+  CTableHead,
+  CTableHeaderCell,
+  CTableRow,
+} from "@coreui/react";
+
 const PRIORITY_LABEL = {
   1: "Critical",
   2: "High",
   3: "Bulk",
 };
 
-function statusClass(status) {
+function statusColor(status) {
   if (!status) {
-    return "bg-slate-500/20 text-slate-200";
+    return "secondary";
   }
   if (status.includes("DELIVERED")) {
-    return "bg-green-500/20 text-green-200";
+    return "success";
   }
   if (status.includes("ERROR") || status.includes("FAILED")) {
-    return "bg-red-500/20 text-red-200";
+    return "danger";
   }
   if (status.includes("WAITING")) {
-    return "bg-yellow-500/20 text-yellow-200";
+    return "warning";
   }
-  return "bg-cyan-500/20 text-cyan-100";
+  return "info";
+}
+
+function priorityColor(priority) {
+  if (priority === 1) {
+    return "danger";
+  }
+  if (priority === 2) {
+    return "warning";
+  }
+  return "secondary";
 }
 
 export default function PacketTable({ packets, loading }) {
   return (
-    <section className="panel p-5">
-      <div className="flex items-center justify-between gap-3">
-        <h2 className="hud-title text-sm text-oceanic-100">Packet Routing View</h2>
-        <span className="rounded border border-oceanic-300/40 px-2 py-1 text-xs text-oceanic-200">
+    <CCard className="surface-card">
+      <CCardHeader className="d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <div>
+          <h2 className="h6 mb-0">Packet Routing Monitor</h2>
+          <small className="text-body-secondary">Live DTN packet telemetry with current delivery state</small>
+        </div>
+        <CBadge color="primary" shape="rounded-pill">
           {packets.length} packets
-        </span>
-      </div>
+        </CBadge>
+      </CCardHeader>
+      <CCardBody>
+        {loading && (
+          <div className="d-flex align-items-center gap-2">
+            <CSpinner size="sm" />
+            <span>Loading packet telemetry...</span>
+          </div>
+        )}
 
-      <div className="mt-4 overflow-auto">
-        <table className="min-w-full text-left text-sm">
-          <thead className="text-xs uppercase tracking-wide text-oceanic-200">
-            <tr>
-              <th className="pb-3 pr-3">Packet ID</th>
-              <th className="pb-3 pr-3">Route</th>
-              <th className="pb-3 pr-3">Priority</th>
-              <th className="pb-3 pr-3">Next Hop</th>
-              <th className="pb-3 pr-3">Status</th>
-              <th className="pb-3">Earth Timestamp</th>
-            </tr>
-          </thead>
-          <tbody className="text-oceanic-100">
-            {loading && (
-              <tr>
-                <td className="py-3 text-oceanic-200" colSpan={6}>
-                  Loading packet telemetry...
-                </td>
-              </tr>
-            )}
+        {!loading && packets.length === 0 && (
+          <p className="mb-0 text-body-secondary">No packets yet. Send your first IoT payload from the dispatch console.</p>
+        )}
 
-            {!loading && packets.length === 0 && (
-              <tr>
-                <td className="py-3 text-oceanic-200" colSpan={6}>
-                  No packets in history yet.
-                </td>
-              </tr>
-            )}
-
-            {packets.map((packet) => (
-              <tr className="border-t border-oceanic-400/20" key={packet.packet_id}>
-                <td className="py-3 pr-3 align-top font-semibold">{packet.packet_id.slice(0, 8)}</td>
-                <td className="py-3 pr-3 align-top">
-                  {packet.source_node} -> {packet.destination_node}
-                </td>
-                <td className="py-3 pr-3 align-top">
-                  {PRIORITY_LABEL[packet.priority] || `P${packet.priority}`}
-                </td>
-                <td className="py-3 pr-3 align-top">{packet.next_hop || "unassigned"}</td>
-                <td className="py-3 pr-3 align-top">
-                  <span
-                    className={`rounded-full px-2 py-1 text-xs font-semibold ${statusClass(
-                      packet.current_status
-                    )}`}
-                  >
-                    {packet.current_status}
-                  </span>
-                </td>
-                <td className="py-3 align-top text-xs text-oceanic-200">{packet.earth_timestamp}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </section>
+        {!loading && packets.length > 0 && (
+          <div className="table-responsive">
+            <CTable hover align="middle" className="mb-0">
+              <CTableHead>
+                <CTableRow>
+                  <CTableHeaderCell scope="col">Packet ID</CTableHeaderCell>
+                  <CTableHeaderCell scope="col">Route</CTableHeaderCell>
+                  <CTableHeaderCell scope="col">Priority</CTableHeaderCell>
+                  <CTableHeaderCell scope="col">Next Hop</CTableHeaderCell>
+                  <CTableHeaderCell scope="col">Status</CTableHeaderCell>
+                  <CTableHeaderCell scope="col">Earth Timestamp</CTableHeaderCell>
+                </CTableRow>
+              </CTableHead>
+              <CTableBody>
+                {packets.map((packet) => (
+                  <CTableRow key={packet.packet_id}>
+                    <CTableDataCell className="mono">{packet.packet_id.slice(0, 8)}</CTableDataCell>
+                    <CTableDataCell>
+                      {packet.source_node}
+                      {" -> "}
+                      {packet.destination_node}
+                    </CTableDataCell>
+                    <CTableDataCell>
+                      <CBadge color={priorityColor(packet.priority)}>
+                        {PRIORITY_LABEL[packet.priority] || `P${packet.priority}`}
+                      </CBadge>
+                    </CTableDataCell>
+                    <CTableDataCell>{packet.next_hop || "unassigned"}</CTableDataCell>
+                    <CTableDataCell>
+                      <CBadge color={statusColor(packet.current_status)}>{packet.current_status}</CBadge>
+                    </CTableDataCell>
+                    <CTableDataCell className="text-body-secondary mono">
+                      {packet.earth_timestamp}
+                    </CTableDataCell>
+                  </CTableRow>
+                ))}
+              </CTableBody>
+            </CTable>
+          </div>
+        )}
+      </CCardBody>
+    </CCard>
   );
 }
