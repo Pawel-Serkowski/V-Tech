@@ -22,40 +22,44 @@ curl -sS -X POST "${API_BASE_URL}/api/nodes" \
   -d '{
     "nodes": [
       {
-        "node_id": "GS_CANCEL_TEST",
+        "node_id": "EARTH_GATEWAY",
         "node_type": "ground_station",
         "orbit": "Earth Surface",
         "time_offset_seconds": 0,
-        "links": ["SAT_CANCEL_R1"],
+        "location_label": "Earth Mission Control",
+        "links": ["SAT_1"],
         "contact_windows": [
           {"start": "2026-01-01T00:00:00Z", "end": "2027-01-01T00:00:00Z"}
         ]
       },
       {
-        "node_id": "SAT_CANCEL_R1",
+        "node_id": "SAT_1",
         "node_type": "satellite",
         "orbit": "Relay 1",
         "time_offset_seconds": 0,
-        "links": ["SAT_CANCEL_R2"],
+        "location_label": "NRHO Plane A",
+        "links": ["SAT_2"],
         "contact_windows": [
           {"start": "2026-01-01T00:00:00Z", "end": "2027-01-01T00:00:00Z"}
         ]
       },
       {
-        "node_id": "SAT_CANCEL_R2",
+        "node_id": "SAT_2",
         "node_type": "satellite",
         "orbit": "Relay 2",
         "time_offset_seconds": 0,
-        "links": ["SAT_CANCEL_DST"],
+        "location_label": "Lunar Far Side Relay",
+        "links": ["LUNAR_GATEWAY"],
         "contact_windows": [
           {"start": "2026-01-01T00:00:00Z", "end": "2027-01-01T00:00:00Z"}
         ]
       },
       {
-        "node_id": "SAT_CANCEL_DST",
-        "node_type": "satellite",
+        "node_id": "LUNAR_GATEWAY",
+        "node_type": "relay",
         "orbit": "Destination",
         "time_offset_seconds": 0,
+        "location_label": "Lunar Gateway Hub",
         "links": [],
         "contact_windows": [
           {"start": "2026-01-01T00:00:00Z", "end": "2027-01-01T00:00:00Z"}
@@ -70,8 +74,8 @@ echo "[2/6] Creating packet..."
 ACK_JSON="$(curl -sS -X POST "${API_BASE_URL}/api/packets" \
   -H 'Content-Type: application/json' \
   -d '{
-    "source_node": "GS_CANCEL_TEST",
-    "destination_node": "SAT_CANCEL_DST",
+    "source_node": "EARTH_GATEWAY",
+    "destination_node": "LUNAR_GATEWAY",
     "priority": 1,
     "payload": {"test": "cancel-sim", "seq": 1}
   }')"

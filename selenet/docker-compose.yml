@@ -24,30 +24,101 @@ services:
       MONGO_DB: selenet
       RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
       PACKET_QUEUE_NAME: packets.priority
+      PACKET_QUEUE_PREFIX: packets
       RABBITMQ_MAX_PRIORITY: 10
       STATUS_EXCHANGE_NAME: status.updates
       RETRY_SCAN_INTERVAL_SECONDS: 3
       RETRY_BATCH_SIZE: 200
     ports:
+      - "8000:8000"
       - "8001:8000"
     restart: on-failure
     depends_on:
       - rabbitmq
       - mongo
 
-  worker:
+  worker_earth_gateway:
     build:
       context: .
       dockerfile: Dockerfile
       target: worker
-    container_name: selenet-worker
+    container_name: selenet-worker-earth-gateway
     environment:
       MONGO_URL: mongodb://mongo:27017
       MONGO_DB: selenet
       RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
-      PACKET_QUEUE_NAME: packets.priority
+      PACKET_QUEUE_PREFIX: packets
+      NODE_ID: EARTH_GATEWAY
+      NODE_LOCATION: Earth Mission Control
       RABBITMQ_MAX_PRIORITY: 10
       BACKEND_STATUS_URL: http://backend:8000/api/packets/status
+      BACKEND_PACKETS_URL: http://backend:8000/api/packets
+    restart: on-failure
+    depends_on:
+      - backend
+      - rabbitmq
+      - mongo
+
+  worker_sat_1:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: worker
+    container_name: selenet-worker-sat-1
+    environment:
+      MONGO_URL: mongodb://mongo:27017
+      MONGO_DB: selenet
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
+      PACKET_QUEUE_PREFIX: packets
+      NODE_ID: SAT_1
+      NODE_LOCATION: NRHO Plane A
+      RABBITMQ_MAX_PRIORITY: 10
+      BACKEND_STATUS_URL: http://backend:8000/api/packets/status
+      BACKEND_PACKETS_URL: http://backend:8000/api/packets
+    restart: on-failure
+    depends_on:
+      - backend
+      - rabbitmq
+      - mongo
+
+  worker_sat_2:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: worker
+    container_name: selenet-worker-sat-2
+    environment:
+      MONGO_URL: mongodb://mongo:27017
+      MONGO_DB: selenet
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
+      PACKET_QUEUE_PREFIX: packets
+      NODE_ID: SAT_2
+      NODE_LOCATION: Lunar Far Side Relay
+      RABBITMQ_MAX_PRIORITY: 10
+      BACKEND_STATUS_URL: http://backend:8000/api/packets/status
+      BACKEND_PACKETS_URL: http://backend:8000/api/packets
+    restart: on-failure
+    depends_on:
+      - backend
+      - rabbitmq
+      - mongo
+
+  worker_lunar_gateway:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: worker
+    container_name: selenet-worker-lunar-gateway
+    environment:
+      MONGO_URL: mongodb://mongo:27017
+      MONGO_DB: selenet
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
+      PACKET_QUEUE_PREFIX: packets
+      NODE_ID: LUNAR_GATEWAY
+      NODE_LOCATION: Lunar Gateway Hub
+      RABBITMQ_MAX_PRIORITY: 10
+      BACKEND_STATUS_URL: http://backend:8000/api/packets/status
+      BACKEND_PACKETS_URL: http://backend:8000/api/packets
     restart: on-failure
     depends_on:
       - backend

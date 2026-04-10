@@ -35,6 +35,7 @@ class NodeConfig(BaseModel):
     node_id: str = Field(min_length=1)
     node_type: Literal["ground_station", "satellite", "relay"] = "satellite"
     orbit: str | None = None
+    location_label: str | None = None
     time_offset_seconds: int = 0
     contact_windows: list[ContactWindow] = Field(default_factory=list)
     links: list[str] = Field(default_factory=list)
@@ -87,11 +88,14 @@ class PacketStatusUpdate(BaseModel):
     status: str = Field(min_length=1)
     at: datetime
     detail: str | None = None
+    node_id: str | None = None
     next_hop: str | None = None
     hop_index: int | None = None
     hop_total: int | None = None
     from_node: str | None = None
     to_node: str | None = None
+    from_location: str | None = None
+    to_location: str | None = None
 
 
 class PacketSummary(BaseModel):
@@ -104,6 +108,7 @@ class PacketSummary(BaseModel):
     cancel_requested_at: datetime | None = None
     next_hop: str | None = None
     route_hops: list[str] = Field(default_factory=list)
+    route_locations: dict[str, str] = Field(default_factory=dict)
     earth_timestamp: datetime
     status_history: list[dict[str, Any]] = Field(default_factory=list)
 

@@ -2,7 +2,7 @@
 
 set -euo pipefail
 
-API_BASE_URL="${API_BASE_URL:-http://localhost:8000}"
+API_BASE_URL="${API_BASE_URL:-http://localhost:8001}"
 
 echo "[1/5] Uploading CLOSED windows so packet starts in WAITING_RETRY..."
 curl -sS -X POST "${API_BASE_URL}/api/nodes" \
@@ -10,19 +10,23 @@ curl -sS -X POST "${API_BASE_URL}/api/nodes" \
   -d '{
     "nodes": [
       {
-        "node_id": "ESTRACK_PL",
+        "node_id": "EARTH_GATEWAY",
         "node_type": "ground_station",
         "orbit": "Earth Surface",
         "time_offset_seconds": 0,
+        "location_label": "Earth Mission Control",
+        "links": ["SAT_1"],
         "contact_windows": [
           {"start": "2026-01-01T00:00:00Z", "end": "2026-01-01T00:00:30Z"}
         ]
       },
       {
-        "node_id": "LUNA_ORBITER_A",
+        "node_id": "SAT_1",
         "node_type": "satellite",
         "orbit": "NRHO",
         "time_offset_seconds": 2,
+        "location_label": "NRHO Plane A",
+        "links": [],
         "contact_windows": [
           {"start": "2026-01-01T00:00:00Z", "end": "2026-01-01T00:00:30Z"}
         ]
@@ -36,8 +40,8 @@ echo "[2/5] Sending packet that should land in WAITING_RETRY..."
 ACK_JSON="$(curl -sS -X POST "${API_BASE_URL}/api/packets" \
   -H 'Content-Type: application/json' \
   -d '{
-    "source_node": "ESTRACK_PL",
-    "destination_node": "LUNA_ORBITER_A",
+    "source_node": "EARTH_GATEWAY",
+    "destination_node": "SAT_1",
     "priority": 2,
     "payload": {"telemetry": "retry-sim", "seq": 1}
   }')"
@@ -53,20 +57,24 @@ curl -sS -X POST "${API_BASE_URL}/api/nodes" \
   -d '{
     "nodes": [
       {
-        "node_id": "ESTRACK_PL",
+        "node_id": "EARTH_GATEWAY",
         "node_type": "ground_station",
         "orbit": "Earth Surface",
         "time_offset_seconds": 0,
+        "location_label": "Earth Mission Control",
+        "links": ["SAT_1"],
         "contact_windows": [
           {"start": "2026-01-01T00:00:00Z", "end": "2027-01-01T00:00:00Z"},
           {"start": "2027-01-02T00:00:00Z", "end": "2027-01-02T02:00:00Z"}
         ]
       },
       {
-        "node_id": "LUNA_ORBITER_A",
+        "node_id": "SAT_1",
         "node_type": "satellite",
         "orbit": "NRHO",
         "time_offset_seconds": 2,
+        "location_label": "NRHO Plane A",
+        "links": [],
         "contact_windows": [
           {"start": "2026-01-01T00:00:00Z", "end": "2027-01-01T00:00:00Z"},
           {"start": "2027-01-02T00:10:00Z", "end": "2027-01-02T03:00:00Z"}
