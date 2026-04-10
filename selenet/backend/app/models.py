@@ -37,6 +37,22 @@ class NodeConfig(BaseModel):
     orbit: str | None = None
     time_offset_seconds: int = 0
     contact_windows: list[ContactWindow] = Field(default_factory=list)
+    links: list[str] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def validate_links(self) -> "NodeConfig":
+        cleaned_links: list[str] = []
+        seen: set[str] = set()
+
+        for item in self.links:
+            node_id = item.strip()
+            if not node_id or node_id == self.node_id or node_id in seen:
+                continue
+            seen.add(node_id)
+            cleaned_links.append(node_id)
+
+        self.links = cleaned_links
+        return self
 
 
 class NodeUploadRequest(BaseModel):
@@ -63,6 +79,7 @@ class PacketAck(BaseModel):
     status: str
     earth_timestamp: datetime
     next_hop: str | None = None
+    route_hops: list[str] = Field(default_factory=list)
 
 
 class PacketStatusUpdate(BaseModel):
@@ -71,6 +88,10 @@ class PacketStatusUpdate(BaseModel):
     at: datetime
     detail: str | None = None
     next_hop: str | None = None
+    hop_index: int | None = None
+    hop_total: int | None = None
+    from_node: str | None = None
+    to_node: str | None = None
 
 
 class PacketSummary(BaseModel):
@@ -80,6 +101,7 @@ class PacketSummary(BaseModel):
     priority: int
     current_status: str
     next_hop: str | None = None
+    route_hops: list[str] = Field(default_factory=list)
     earth_timestamp: datetime
     status_history: list[dict[str, Any]] = Field(default_factory=list)
 

@@ -21,7 +21,7 @@ docker compose up --build
 - RabbitMQ Management: http://localhost:15672 (guest / guest)
 
 ## Key Backend Routes
-- `POST /api/packets` - ingest packet, persist on Earth, enqueue by priority
+- `POST /api/packets` - ingest packet, persist on Earth, compute route plan (`route_hops`), enqueue by priority
 - `GET /api/packets` - list recent packets
 - `GET /api/packets/queue-load` - current queue load view (derived from stored packet statuses)
 - `POST /api/packets/status` - internal status callback (worker -> backend)
@@ -41,6 +41,18 @@ docker compose up --build
 - Sample config with multiple visibility windows:
 	- `simulations/nodes.multi-window.json`
 
+Node schema supports optional directed links:
+- `links`: list of next-hop node IDs available from this node.
+
+If `links` are omitted for a node, the router falls back to legacy behavior and considers all known nodes as candidates.
+
+## Multi-Hop Routing and Telemetry
+- Backend computes full route plans as `route_hops` (for example: `RELAY_A -> RELAY_B -> DEST`).
+- Worker emits hop-by-hop `IN_TRANSIT` updates with:
+	- `hop_index`, `hop_total`
+	- `from_node`, `to_node`
+- Packet `status_history` now records traversal across intermediate satellites/relays.
+
 Upload example:
 ```bash
 curl -X POST http://localhost:8000/api/nodes \
@@ -59,5 +71,5 @@ chmod +x scripts/simulate_retry_flow.sh
 ## Notes
 - Frontend, backend, and worker are built from a single multi-stage Dockerfile: `selenet/Dockerfile`.
 - Priority queue uses RabbitMQ `x-max-priority`.
-- Worker currently simulates transport delay and posts lifecycle updates back to backend.
+- Worker simulates transport delay per hop and posts lifecycle updates back to backend.
 - `time_offset_seconds` is stored for demonstrations, while routing logic uses Earth baseline time.

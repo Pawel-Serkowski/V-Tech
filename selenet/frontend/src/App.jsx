@@ -117,7 +117,10 @@ export default function App() {
 
     try {
       const ack = await createPacket(payload);
-      setMessage(`Packet ${ack.packet_id} accepted with status ${ack.status}.`);
+      const routeSummary = Array.isArray(ack.route_hops) && ack.route_hops.length > 0
+        ? ` Planned route: ${ack.route_hops.join(" -> ")}.`
+        : "";
+      setMessage(`Packet ${ack.packet_id} accepted with status ${ack.status}.${routeSummary}`);
       await refreshData();
     } catch (err) {
       setError(err.message);
@@ -263,6 +266,12 @@ export default function App() {
                             <span className="mono fw-semibold">{event.packet_id || "unknown-packet"}</span>
                             <span className="mx-2 text-body-secondary">{"->"}</span>
                             <CBadge color="primary">{event.status || "unknown-status"}</CBadge>
+                            {typeof event.hop_index === "number" && typeof event.hop_total === "number" && (
+                              <small className="text-body-secondary ms-2">
+                                hop {event.hop_index}/{event.hop_total}
+                                {event.from_node && event.to_node ? ` ${event.from_node} -> ${event.to_node}` : ""}
+                              </small>
+                            )}
                             {event.next_hop && (
                               <small className="text-body-secondary ms-2">via {event.next_hop}</small>
                             )}

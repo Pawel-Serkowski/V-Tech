@@ -44,6 +44,21 @@ function priorityColor(priority) {
   return "secondary";
 }
 
+function getLatestHopRow(packet) {
+  if (!Array.isArray(packet.status_history)) {
+    return null;
+  }
+
+  for (let index = packet.status_history.length - 1; index >= 0; index -= 1) {
+    const row = packet.status_history[index];
+    if (typeof row?.hop_index === "number" && typeof row?.hop_total === "number") {
+      return row;
+    }
+  }
+
+  return null;
+}
+
 export default function PacketTable({ packets, loading }) {
   return (
     <CCard className="surface-card">
@@ -75,6 +90,7 @@ export default function PacketTable({ packets, loading }) {
                 <CTableRow>
                   <CTableHeaderCell scope="col">Packet ID</CTableHeaderCell>
                   <CTableHeaderCell scope="col">Route</CTableHeaderCell>
+                  <CTableHeaderCell scope="col">Planned Hops</CTableHeaderCell>
                   <CTableHeaderCell scope="col">Priority</CTableHeaderCell>
                   <CTableHeaderCell scope="col">Next Hop</CTableHeaderCell>
                   <CTableHeaderCell scope="col">Status</CTableHeaderCell>
@@ -82,28 +98,45 @@ export default function PacketTable({ packets, loading }) {
                 </CTableRow>
               </CTableHead>
               <CTableBody>
-                {packets.map((packet) => (
-                  <CTableRow key={packet.packet_id}>
-                    <CTableDataCell className="mono">{packet.packet_id.slice(0, 8)}</CTableDataCell>
-                    <CTableDataCell>
-                      {packet.source_node}
-                      {" -> "}
-                      {packet.destination_node}
-                    </CTableDataCell>
-                    <CTableDataCell>
-                      <CBadge color={priorityColor(packet.priority)}>
-                        {PRIORITY_LABEL[packet.priority] || `P${packet.priority}`}
-                      </CBadge>
-                    </CTableDataCell>
-                    <CTableDataCell>{packet.next_hop || "unassigned"}</CTableDataCell>
-                    <CTableDataCell>
-                      <CBadge color={statusColor(packet.current_status)}>{packet.current_status}</CBadge>
-                    </CTableDataCell>
-                    <CTableDataCell className="text-body-secondary mono">
-                      {packet.earth_timestamp}
-                    </CTableDataCell>
-                  </CTableRow>
-                ))}
+                {packets.map((packet) => {
+                  const latestHop = getLatestHopRow(packet);
+
+                  return (
+                    <CTableRow key={packet.packet_id}>
+                      <CTableDataCell className="mono">{packet.packet_id.slice(0, 8)}</CTableDataCell>
+                      <CTableDataCell>
+                        {packet.source_node}
+                        {" -> "}
+                        {packet.destination_node}
+                      </CTableDataCell>
+                      <CTableDataCell className="mono">
+                        {Array.isArray(packet.route_hops) && packet.route_hops.length > 0
+                          ? packet.route_hops.join(" -> ")
+                          : "n/a"}
+                      </CTableDataCell>
+                      <CTableDataCell>
+                        <CBadge color={priorityColor(packet.priority)}>
+                          {PRIORITY_LABEL[packet.priority] || `P${packet.priority}`}
+                        </CBadge>
+                      </CTableDataCell>
+                      <CTableDataCell>{packet.next_hop || "unassigned"}</CTableDataCell>
+                      <CTableDataCell>
+                        <CBadge color={statusColor(packet.current_status)}>{packet.current_status}</CBadge>
+                        {latestHop && (
+                          <small className="d-block text-body-secondary mt-1 mono">
+                            hop {latestHop.hop_index}/{latestHop.hop_total}
+                            {latestHop.from_node && latestHop.to_node
+                              ? ` ${latestHop.from_node} -> ${latestHop.to_node}`
+                              : ""}
+                          </small>
+                        )}
+                      </CTableDataCell>
+                      <CTableDataCell className="text-body-secondary mono">
+                        {packet.earth_timestamp}
+                      </CTableDataCell>
+                    </CTableRow>
+                  );
+                })}
               </CTableBody>
             </CTable>
           </div>

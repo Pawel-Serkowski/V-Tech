@@ -17,6 +17,7 @@ const TEMPLATE = `[
     "node_type": "ground_station",
     "orbit": "Earth Surface",
     "time_offset_seconds": 0,
+    "links": ["LUNA_RELAY_B"],
     "contact_windows": [
       {
         "start": "2026-04-10T07:50:00Z",
@@ -33,10 +34,32 @@ const TEMPLATE = `[
     ]
   },
   {
+    "node_id": "LUNA_RELAY_B",
+    "node_type": "relay",
+    "orbit": "Trans-Lunar Corridor",
+    "time_offset_seconds": 1,
+    "links": ["LUNA_ORBITER_A"],
+    "contact_windows": [
+      {
+        "start": "2026-04-10T07:58:00Z",
+        "end": "2026-04-10T08:42:00Z"
+      },
+      {
+        "start": "2026-04-10T12:18:00Z",
+        "end": "2026-04-10T13:04:00Z"
+      },
+      {
+        "start": "2026-04-10T18:54:00Z",
+        "end": "2026-04-10T19:56:00Z"
+      }
+    ]
+  },
+  {
     "node_id": "LUNA_ORBITER_A",
     "node_type": "satellite",
     "orbit": "NRHO",
     "time_offset_seconds": 2,
+    "links": [],
     "contact_windows": [
       {
         "start": "2026-04-10T08:00:00Z",

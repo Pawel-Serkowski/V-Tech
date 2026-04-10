@@ -7,12 +7,13 @@ Build a delay-tolerant networking simulation that routes packets between Earth g
 - Split architecture: Frontend <-> Backend uses REST + WebSocket.
 - Immediate ACK: Backend confirms packet persistence on Earth as soon as it stores packet metadata.
 - Brokered routing: Backend publishes packet envelopes to RabbitMQ priority queues.
-- DTN simulation: Worker consumes packets and simulates intermittent links and transmission delay.
+- Multi-hop route planning: Backend computes `route_hops` from source to destination using contact windows and node links.
+- DTN simulation: Worker consumes packets and simulates intermittent links and transmission delay for each hop.
 - Earth time baseline: Routing logic uses Earth time only (`earth_timestamp`) while keeping `time_offset_seconds` in node configs for demo and analysis.
 
 ## Primary Components
 - Frontend dashboard (`frontend`): command center UI for packets, queue load, and node configuration uploads.
-- Backend API (`backend/app`): packet ingest, CGR next-hop selection skeleton, persistence, websocket push.
+- Backend API (`backend/app`): packet ingest, CGR route selection, persistence, websocket push.
 - Space link worker (`backend/worker`): consumes priority queue and posts status updates back to backend.
 - MongoDB: stores node configuration and packet status history.
 - RabbitMQ: stores per-packet priority in a durable queue with `x-max-priority`.

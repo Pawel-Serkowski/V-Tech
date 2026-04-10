@@ -25,12 +25,13 @@ async def ingest_packet(packet: PacketCreate) -> PacketAck:
     earth_timestamp = datetime.now(timezone.utc)
 
     nodes = await db.nodes.find({}, {"_id": 0}).to_list(length=5000)
-    next_hop = CGREngine.compute_next_hop(
+    route_hops = CGREngine.compute_route_hops(
         source_node=packet.source_node,
         destination_node=packet.destination_node,
         nodes=nodes,
         earth_timestamp=earth_timestamp,
     )
+    next_hop = route_hops[0] if route_hops else None
 
     queue_status = "QUEUED_ON_EARTH" if next_hop else "WAITING_RETRY"
 
@@ -44,6 +45,7 @@ async def ingest_packet(packet: PacketCreate) -> PacketAck:
             "status": queue_status,
             "at": earth_timestamp,
             "detail": "Packet persisted and evaluated by CGR.",
+            "next_hop": next_hop,
         },
     ]
 
@@ -55,6 +57,7 @@ async def ingest_packet(packet: PacketCreate) -> PacketAck:
         "payload": packet.payload,
         "earth_timestamp": earth_timestamp,
         "next_hop": next_hop,
+        "route_hops": route_hops or [],
         "current_status": queue_status,
         "status_history": status_history,
     }
@@ -66,6 +69,7 @@ async def ingest_packet(packet: PacketCreate) -> PacketAck:
             "source_node": packet.source_node,
             "destination_node": packet.destination_node,
             "next_hop": next_hop,
+            "route_hops": route_hops,
             "earth_timestamp": earth_timestamp.isoformat(),
             "priority": int(packet.priority),
             "payload": packet.payload,
@@ -78,6 +82,7 @@ async def ingest_packet(packet: PacketCreate) -> PacketAck:
             "packet_id": packet_id,
             "status": queue_status,
             "next_hop": next_hop,
+            "route_hops": route_hops,
             "at": earth_timestamp.isoformat(),
         }
     )
@@ -87,6 +92,7 @@ async def ingest_packet(packet: PacketCreate) -> PacketAck:
         status="SAVED_ON_EARTH",
         earth_timestamp=earth_timestamp,
         next_hop=next_hop,
+        route_hops=route_hops or [],
     )
 
 
@@ -140,12 +146,22 @@ async def register_status_update(update: PacketStatusUpdate) -> dict[str, Any]:
     }
     if update.next_hop is not None:
         set_payload["next_hop"] = update.next_hop
+    if update.to_node is not None:
+        set_payload["next_hop"] = update.to_node
+    if update.hop_index is not None:
+        set_payload["current_hop_index"] = update.hop_index
+    if update.hop_total is not None:
+        set_payload["hop_total"] = update.hop_total
 
     history_row = {
         "status": update.status,
         "at": update.at,
         "detail": update.detail,
         "next_hop": update.next_hop,
+        "hop_index": update.hop_index,
+        "hop_total": update.hop_total,
+        "from_node": update.from_node,
+        "to_node": update.to_node,
     }
 
     result = await db.packets.update_one(
@@ -166,6 +182,10 @@ async def register_status_update(update: PacketStatusUpdate) -> dict[str, Any]:
             "status": update.status,
             "next_hop": update.next_hop,
             "detail": update.detail,
+            "hop_index": update.hop_index,
+            "hop_total": update.hop_total,
+            "from_node": update.from_node,
+            "to_node": update.to_node,
             "at": update.at.isoformat(),
         }
     )

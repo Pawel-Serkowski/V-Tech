@@ -82,12 +82,13 @@ class PacketRetryEngine:
         ).sort("earth_timestamp", 1).limit(settings.retry_batch_size).to_list(length=settings.retry_batch_size)
 
         for packet in waiting_packets:
-            next_hop = CGREngine.compute_next_hop(
+            route_hops = CGREngine.compute_route_hops(
                 source_node=packet["source_node"],
                 destination_node=packet["destination_node"],
                 nodes=nodes,
                 earth_timestamp=now,
             )
+            next_hop = route_hops[0] if route_hops else None
 
             if not next_hop:
                 continue
@@ -104,6 +105,7 @@ class PacketRetryEngine:
                     "$set": {
                         "current_status": "QUEUED_ON_EARTH",
                         "next_hop": next_hop,
+                        "route_hops": route_hops,
                         "updated_at": now,
                     },
                     "$push": {
@@ -125,6 +127,7 @@ class PacketRetryEngine:
                 "source_node": packet["source_node"],
                 "destination_node": packet["destination_node"],
                 "next_hop": next_hop,
+                "route_hops": route_hops,
                 "earth_timestamp": str(packet["earth_timestamp"]),
                 "priority": int(packet.get("priority", PacketPriority.BULK)),
                 "payload": packet.get("payload", {}),
@@ -141,6 +144,7 @@ class PacketRetryEngine:
                     "packet_id": packet_id,
                     "status": "QUEUED_ON_EARTH",
                     "next_hop": next_hop,
+                    "route_hops": route_hops,
                     "detail": detail,
                     "at": now.isoformat(),
                 }
