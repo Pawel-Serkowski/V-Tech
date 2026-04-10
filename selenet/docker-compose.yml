@@ -1,4 +1,4 @@
-name: selnet
+name: selenet
 
 services:
   frontend:
@@ -6,7 +6,7 @@ services:
       context: .
       dockerfile: Dockerfile
       target: frontend
-    container_name: selnet-frontend
+    container_name: selenet-frontend
     environment:
       VITE_API_BASE_URL: http://localhost:8001
       VITE_WS_URL: ws://localhost:8001/ws/status
@@ -20,10 +20,10 @@ services:
       context: .
       dockerfile: Dockerfile
       target: backend
-    container_name: selnet-backend
+    container_name: selenet-backend
     environment:
       MONGO_URL: mongodb://mongo:27017
-      MONGO_DB: selnet
+      MONGO_DB: selenet
       RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
       PACKET_QUEUE_NAME: packets.priority
       PACKET_QUEUE_PREFIX: packets
@@ -44,10 +44,10 @@ services:
       context: .
       dockerfile: Dockerfile
       target: worker
-    container_name: selnet-worker-earth-gateway
+    container_name: selenet-worker-earth-gateway
     environment:
       MONGO_URL: mongodb://mongo:27017
-      MONGO_DB: selnet
+      MONGO_DB: selenet
       RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
       PACKET_QUEUE_PREFIX: packets
       NODE_ID: EARTH_GATEWAY
@@ -66,10 +66,10 @@ services:
       context: .
       dockerfile: Dockerfile
       target: worker
-    container_name: selnet-worker-sat-1
+    container_name: selenet-worker-sat-1
     environment:
       MONGO_URL: mongodb://mongo:27017
-      MONGO_DB: selnet
+      MONGO_DB: selenet
       RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
       PACKET_QUEUE_PREFIX: packets
       NODE_ID: SAT_1
@@ -88,10 +88,10 @@ services:
       context: .
       dockerfile: Dockerfile
       target: worker
-    container_name: selnet-worker-sat-2
+    container_name: selenet-worker-sat-2
     environment:
       MONGO_URL: mongodb://mongo:27017
-      MONGO_DB: selnet
+      MONGO_DB: selenet
       RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
       PACKET_QUEUE_PREFIX: packets
       NODE_ID: SAT_2
@@ -110,10 +110,10 @@ services:
       context: .
       dockerfile: Dockerfile
       target: worker
-    container_name: selnet-worker-lunar-gateway
+    container_name: selenet-worker-lunar-gateway
     environment:
       MONGO_URL: mongodb://mongo:27017
-      MONGO_DB: selnet
+      MONGO_DB: selenet
       RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
       PACKET_QUEUE_PREFIX: packets
       NODE_ID: LUNAR_GATEWAY
@@ -129,7 +129,7 @@ services:
 
   rabbitmq:
     image: rabbitmq:3.13-management
-    container_name: selnet-rabbitmq
+    container_name: selenet-rabbitmq
     ports:
       - "5672:5672"
       - "15672:15672"
@@ -138,7 +138,7 @@ services:
 
   mongo:
     image: mongo:7
-    container_name: selnet-mongo
+    container_name: selenet-mongo
     ports:
       - "27017:27017"
     volumes:

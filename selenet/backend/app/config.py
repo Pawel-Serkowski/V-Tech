@@ -4,9 +4,9 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    app_name: str = "selnet Control Backend"
+    app_name: str = "selenet Control Backend"
     mongo_url: str = "mongodb://mongo:27017"
-    mongo_db: str = "selnet"
+    mongo_db: str = "selenet"
     rabbitmq_url: str = "amqp://guest:guest@rabbitmq:5672/"
     packet_queue_name: str = "packets.priority"
     packet_queue_prefix: str = "packets"

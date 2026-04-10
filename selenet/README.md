@@ -1,6 +1,6 @@
-# selnet Monorepo
+# selenet Monorepo
 
-selnet to symulacja routingu Earth-Moon Gateway oparta o DTN (Delay-Tolerant Networking).
+selenet to symulacja routingu Earth-Moon Gateway oparta o DTN (Delay-Tolerant Networking).
 Projekt jest zrobiony jako zestaw uslug (frontend + backend + broker + workerzy), gdzie kazdy worker symuluje osobny wezel/satelite.
 
 ## Szybki Start (najkrotsza sciezka)
@@ -8,7 +8,7 @@ Projekt jest zrobiony jako zestaw uslug (frontend + backend + broker + workerzy)
 1. Wejdz do katalogu projektu:
 
 ```bash
-cd selnet
+cd selenet
 ```
 
 2. Uruchom wszystko (z budowaniem obrazow):

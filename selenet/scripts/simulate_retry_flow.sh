@@ -32,8 +32,8 @@ curl -sS -X POST "${API_BASE_URL}/api/nodes" \
         ]
       }
     ]
-  }' > /tmp/selnet-retry-step1.json
-cat /tmp/selnet-retry-step1.json
+  }' > /tmp/selenet-retry-step1.json
+cat /tmp/selenet-retry-step1.json
 
 echo
 echo "[2/5] Sending packet that should land in WAITING_RETRY..."
@@ -81,8 +81,8 @@ curl -sS -X POST "${API_BASE_URL}/api/nodes" \
         ]
       }
     ]
-  }' > /tmp/selnet-retry-step3.json
-cat /tmp/selnet-retry-step3.json
+  }' > /tmp/selenet-retry-step3.json
+cat /tmp/selenet-retry-step3.json
 
 echo
 echo "[4/5] Polling packet status (up to ~30 seconds)..."

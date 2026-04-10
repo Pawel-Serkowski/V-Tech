@@ -1,4 +1,4 @@
-# Earth-Moon Gateway Communication Routing (selnet)
+# Earth-Moon Gateway Communication Routing (selenet)
 
 ## Mission
 Build a delay-tolerant networking simulation that routes packets between Earth ground nodes and Moon satellites.

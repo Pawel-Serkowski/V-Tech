@@ -1,1 +1,1 @@
-# selnet backend package
+# selenet backend package
