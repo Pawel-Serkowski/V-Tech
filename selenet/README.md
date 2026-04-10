@@ -30,6 +30,32 @@ docker compose up --build
 - `GET /api/nodes` - list nodes
 - `WS /ws/status` - real-time status stream
 
+## Automatic Retry (WAITING_RETRY)
+- Backend runs a retry loop that periodically scans packets in `WAITING_RETRY`.
+- When a valid contact window appears, packet is automatically re-routed, switched to `QUEUED_ON_EARTH`, and published to RabbitMQ.
+- Retry loop is configurable via environment:
+	- `RETRY_SCAN_INTERVAL_SECONDS` (default `3` in compose)
+	- `RETRY_BATCH_SIZE` (default `200` in compose)
+
+## Multi-Window Node Configuration
+- Sample config with multiple visibility windows:
+	- `simulations/nodes.multi-window.json`
+
+Upload example:
+```bash
+curl -X POST http://localhost:8000/api/nodes \
+	-H 'Content-Type: application/json' \
+	--data-binary @simulations/nodes.multi-window.json
+```
+
+## Retry Simulation (End-to-End)
+Run automated simulation that forces `WAITING_RETRY`, opens windows, and verifies transition to `DELIVERED`:
+
+```bash
+chmod +x scripts/simulate_retry_flow.sh
+./scripts/simulate_retry_flow.sh
+```
+
 ## Notes
 - Frontend, backend, and worker are built from a single multi-stage Dockerfile: `selenet/Dockerfile`.
 - Priority queue uses RabbitMQ `x-max-priority`.

@@ -11,6 +11,8 @@ class Settings(BaseSettings):
     packet_queue_name: str = "packets.priority"
     status_exchange_name: str = "status.updates"
     rabbitmq_max_priority: int = 10
+    retry_scan_interval_seconds: float = 5.0
+    retry_batch_size: int = 200
     cors_origins: str = "*"
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")

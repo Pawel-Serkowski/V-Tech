@@ -26,8 +26,11 @@ services:
       PACKET_QUEUE_NAME: packets.priority
       RABBITMQ_MAX_PRIORITY: 10
       STATUS_EXCHANGE_NAME: status.updates
+      RETRY_SCAN_INTERVAL_SECONDS: 3
+      RETRY_BATCH_SIZE: 200
     ports:
       - "8000:8000"
+    restart: on-failure
     depends_on:
       - rabbitmq
       - mongo
@@ -45,6 +48,7 @@ services:
       PACKET_QUEUE_NAME: packets.priority
       RABBITMQ_MAX_PRIORITY: 10
       BACKEND_STATUS_URL: http://backend:8000/api/packets/status
+    restart: on-failure
     depends_on:
       - backend
       - rabbitmq

@@ -7,6 +7,7 @@ from app.api import nodes, packets
 from app.config import get_settings
 from app.db import close_mongo_connection, connect_to_mongo
 from app.rabbitmq import rabbit_publisher
+from app.retry_engine import packet_retry_engine
 from app.websocket_manager import ws_manager
 
 
@@ -14,7 +15,9 @@ from app.websocket_manager import ws_manager
 async def lifespan(_app: FastAPI):
     await connect_to_mongo()
     await rabbit_publisher.connect()
+    packet_retry_engine.start()
     yield
+    await packet_retry_engine.stop()
     await rabbit_publisher.close()
     await close_mongo_connection()
 

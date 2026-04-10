@@ -1,3 +1,4 @@
+import asyncio
 import json
 from typing import Any
 
@@ -12,27 +13,40 @@ class RabbitPublisher:
         self.connection: AbstractRobustConnection | None = None
         self.channel: AbstractRobustChannel | None = None
 
-    async def connect(self) -> None:
+    async def connect(self, retries: int = 20, retry_delay_seconds: float = 1.5) -> None:
         settings = get_settings()
 
         if self.connection and not self.connection.is_closed:
             return
 
-        self.connection = await aio_pika.connect_robust(settings.rabbitmq_url)
-        self.channel = await self.connection.channel()
-        await self.channel.set_qos(prefetch_count=20)
+        last_error: Exception | None = None
 
-        await self.channel.declare_queue(
-            settings.packet_queue_name,
-            durable=True,
-            arguments={"x-max-priority": settings.rabbitmq_max_priority},
-        )
+        for attempt in range(1, retries + 1):
+            try:
+                self.connection = await aio_pika.connect_robust(settings.rabbitmq_url)
+                self.channel = await self.connection.channel()
+                await self.channel.set_qos(prefetch_count=20)
 
-        await self.channel.declare_exchange(
-            settings.status_exchange_name,
-            aio_pika.ExchangeType.FANOUT,
-            durable=True,
-        )
+                await self.channel.declare_queue(
+                    settings.packet_queue_name,
+                    durable=True,
+                    arguments={"x-max-priority": settings.rabbitmq_max_priority},
+                )
+
+                await self.channel.declare_exchange(
+                    settings.status_exchange_name,
+                    aio_pika.ExchangeType.FANOUT,
+                    durable=True,
+                )
+                return
+            except Exception as exc:  # pragma: no cover - startup resilience
+                last_error = exc
+                if attempt == retries:
+                    break
+                await asyncio.sleep(retry_delay_seconds)
+
+        if last_error is not None:
+            raise last_error
 
     async def publish_packet(self, packet_envelope: dict[str, Any], rabbit_priority: int) -> None:
         if self.channel is None or self.channel.is_closed:

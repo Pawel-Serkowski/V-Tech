@@ -1,0 +1,64 @@
+{
+  "nodes": [
+    {
+      "node_id": "ESTRACK_PL",
+      "node_type": "ground_station",
+      "orbit": "Earth Surface",
+      "time_offset_seconds": 0,
+      "contact_windows": [
+        {
+          "start": "2026-04-10T07:50:00Z",
+          "end": "2026-04-10T08:20:00Z"
+        },
+        {
+          "start": "2026-04-10T12:10:00Z",
+          "end": "2026-04-10T12:50:00Z"
+        },
+        {
+          "start": "2026-04-10T18:45:00Z",
+          "end": "2026-04-10T19:30:00Z"
+        }
+      ]
+    },
+    {
+      "node_id": "ESTRACK_AU",
+      "node_type": "ground_station",
+      "orbit": "Earth Surface",
+      "time_offset_seconds": 1,
+      "contact_windows": [
+        {
+          "start": "2026-04-10T08:05:00Z",
+          "end": "2026-04-10T08:30:00Z"
+        },
+        {
+          "start": "2026-04-10T12:15:00Z",
+          "end": "2026-04-10T12:55:00Z"
+        },
+        {
+          "start": "2026-04-10T19:00:00Z",
+          "end": "2026-04-10T19:40:00Z"
+        }
+      ]
+    },
+    {
+      "node_id": "LUNA_ORBITER_A",
+      "node_type": "satellite",
+      "orbit": "NRHO",
+      "time_offset_seconds": 2,
+      "contact_windows": [
+        {
+          "start": "2026-04-10T08:00:00Z",
+          "end": "2026-04-10T08:40:00Z"
+        },
+        {
+          "start": "2026-04-10T12:20:00Z",
+          "end": "2026-04-10T13:00:00Z"
+        },
+        {
+          "start": "2026-04-10T18:50:00Z",
+          "end": "2026-04-10T19:50:00Z"
+        }
+      ]
+    }
+  ]
+}
