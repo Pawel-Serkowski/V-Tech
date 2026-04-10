@@ -1,5 +1,29 @@
 from datetime import datetime
+import heapq
 from typing import Any
+
+def _build_contacts_for_nodes(nodes, current_time, node_map):
+    contact_plan = []
+    for node in nodes:
+        for window in node.get("contact_windows", []):
+            start = _to_datetime(window.get("start"))
+            end = _to_datetime(window.get("end"))
+
+            if not start or not end or end < current_time:
+                continue
+
+            neighbors = _collect_neighbors(node.get("node_id"), node_map)
+            for neighbor in neighbors:
+                contact_plan.append({
+                    "source": window.get("node_id"),
+                    "dest": neighbor,
+                    "start": start,
+                    "end": end,
+                    "delay": calculate_delay(node, neighbor)
+                })
+    
+    contact_plan.sort(key=lambda x: x["start"])
+    return contact_plan
 
 
 def _to_datetime(value: Any) -> datetime | None:
@@ -68,49 +92,46 @@ class CGREngine:
         nodes: list[dict[str, Any]],
         earth_timestamp: datetime,
     ) -> list[str] | None:
-        node_map = {node.get("node_id"): node for node in nodes if node.get("node_id")}
-        destination = node_map.get(destination_node)
+        node_map = {node.get("node_id"): node for node in nodes}
+        plan = _build_contacts_for_nodes(nodes, earth_timestamp, node_map)
+        plan_by_source = {}
 
-        if destination is None:
-            return None
+        for contact in plan:
+            contact_source_node = contact["source"]
+            if contact_source_node not in plan_by_source:
+                plan_by_source[contact_source_node] = []
+            plan_by_source[contact_source_node].append(contact)
+        
 
-        # Routing uses Earth baseline time only; time_offset_seconds is retained for visualization.
-        visible_nodes = {
-            node_id
-            for node_id, node in node_map.items()
-            if _node_has_open_window(node, earth_timestamp)
-        }
-        if destination_node not in visible_nodes:
-            return None
+        earliest_arrival = {}
+        for node in nodes:
+            earliest_arrival[node.get("node_id")] = float('inf')
+        earliest_arrival[source_node] = earth_timestamp.timestamp()
 
-        # Fast path for direct transfer.
-        if source_node != destination_node and destination_node in visible_nodes:
-            source_neighbors = _collect_neighbors(source_node, node_map)
-            if destination_node in source_neighbors:
-                return [destination_node]
+        priority_queue = [(earth_timestamp.timestamp(), source_node, [])] #czas przybycia, aktualny węzeł, ścieżka
+        while priority_queue:
+            current_time, current_node, path = heapq.heappop(priority_queue)
+            if current_time > earliest_arrival[current_node]: #jeżeli do sprawdzanego węzła już jest gdzies szybsza droga
+                continue
+            
+            if current_node == destination_node:
+                return path
+            
+            for contact in plan_by_source.get(current_node, []):
+                if contact["source"] == current_node:
+                    #wysyłanie nie wcześniej niż pakiet dotrze i nie wcześniej niż dane okienko będzie dostepne
+                    start_send_time = max(current_time, contact["start"].timestamp())
 
-        # Breadth-first search across currently visible nodes.
-        queue: list[tuple[str, list[str]]] = [(source_node, [])]
-        visited: set[str] = {source_node}
+                    #czy pakiet dojdzie przed zamknięciem okna
+                    if start_send_time + contact["delay"] <= contact["end"].timestamp():
+                        arrival_time_to_dest = start_send_time + contact["delay"]
 
-        while queue:
-            current_node_id, path = queue.pop(0)
-            neighbors = _collect_neighbors(current_node_id, node_map)
-
-            for neighbor_id in neighbors:
-                if neighbor_id in visited:
-                    continue
-                if neighbor_id not in visible_nodes:
-                    continue
-
-                next_path = [*path, neighbor_id]
-                if neighbor_id == destination_node:
-                    return next_path
-
-                visited.add(neighbor_id)
-                queue.append((neighbor_id, next_path))
+                        if arrival_time_to_dest < earliest_arrival[contact["dest"]]:
+                            earliest_arrival[contact["dest"]] = arrival_time_to_dest
+                            heapq.heappush(priority_queue, (arrival_time_to_dest, contact["dest"], path + [contact["dest"]]))
 
         return None
+
 
     @staticmethod
     def compute_next_hop(
