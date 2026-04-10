@@ -41,6 +41,7 @@ const IMPORT_TEMPLATE = `{
       "node_id": "RELAY_01",
       "node_type": "relay",
       "orbit": "Lunar Corridor",
+      "location_label": "Lagrange Corridor L1",
       "time_offset_seconds": 0,
       "links": ["SAT_A"],
       "contact_windows": [
@@ -60,6 +61,7 @@ function createEmptyEditor() {
     node_id: "",
     node_type: "satellite",
     orbit: "",
+    location_label: "",
     time_offset_seconds: "0",
     links: [],
     new_link: "",
@@ -162,6 +164,10 @@ function normalizeImportedNode(rawNode, index) {
     node_id: nodeId,
     node_type: parseNodeType(rawNode.node_type),
     orbit: typeof rawNode.orbit === "string" && rawNode.orbit.trim() ? rawNode.orbit.trim() : null,
+    location_label:
+      typeof rawNode.location_label === "string" && rawNode.location_label.trim()
+        ? rawNode.location_label.trim()
+        : null,
     time_offset_seconds: Math.trunc(timeOffsetRaw),
     links: uniqueStrings(Array.isArray(rawNode.links) ? rawNode.links : []),
     contact_windows: windows,
@@ -372,6 +378,7 @@ export default function ObjectsPage({ nodes, loadingNodes, onSaveNodes, onRefres
       node_id: nodeId,
       node_type: parseNodeType(editor.node_type),
       orbit: editor.orbit.trim() ? editor.orbit.trim() : null,
+      location_label: editor.location_label.trim() ? editor.location_label.trim() : null,
       time_offset_seconds: Math.trunc(offsetRaw),
       links,
       contact_windows: windows,
@@ -390,6 +397,7 @@ export default function ObjectsPage({ nodes, loadingNodes, onSaveNodes, onRefres
       node_id: node.node_id || "",
       node_type: parseNodeType(node.node_type),
       orbit: typeof node.orbit === "string" ? node.orbit : "",
+      location_label: typeof node.location_label === "string" ? node.location_label : "",
       time_offset_seconds: String(Number.isFinite(Number(node.time_offset_seconds)) ? node.time_offset_seconds : 0),
       links: uniqueStrings(Array.isArray(node.links) ? node.links : []),
       new_link: "",
@@ -759,6 +767,15 @@ export default function ObjectsPage({ nodes, loadingNodes, onSaveNodes, onRefres
                   value={editor.orbit}
                   onChange={(event) => updateEditorField("orbit", event.target.value)}
                   placeholder="Na przyklad NRHO"
+                />
+              </CCol>
+              <CCol md={6}>
+                <CFormLabel htmlFor="modal-location-label">Lokalizacja (opcjonalnie)</CFormLabel>
+                <CFormInput
+                  id="modal-location-label"
+                  value={editor.location_label}
+                  onChange={(event) => updateEditorField("location_label", event.target.value)}
+                  placeholder="Na przyklad Lunar Gateway Hub"
                 />
               </CCol>
               <CCol md={6}>

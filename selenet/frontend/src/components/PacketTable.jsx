@@ -158,6 +158,9 @@ export default function PacketTable({ packets, loading, onCancelPacket, cancelli
                             {latestHop.from_node && latestHop.to_node
                               ? ` ${latestHop.from_node} -> ${latestHop.to_node}`
                               : ""}
+                            {latestHop.from_location && latestHop.to_location
+                              ? ` (${latestHop.from_location} -> ${latestHop.to_location})`
+                              : ""}
                           </small>
                         )}
                       </CTableDataCell>

@@ -47,7 +47,12 @@ export default function EventFeedPanel({ events, title = "Realtime Event Feed" }
                     {typeof event.hop_index === "number" && typeof event.hop_total === "number" && (
                       <small className="text-body-secondary ms-2">
                         hop {event.hop_index}/{event.hop_total}
-                        {event.from_node && event.to_node ? ` ${event.from_node} -> ${event.to_node}` : ""}
+                        {event.from_node && event.to_node
+                          ? ` ${event.from_node} -> ${event.to_node}`
+                          : ""}
+                        {event.from_location && event.to_location
+                          ? ` (${event.from_location} -> ${event.to_location})`
+                          : ""}
                       </small>
                     )}
                     {event.next_hop && <small className="text-body-secondary ms-2">via {event.next_hop}</small>}

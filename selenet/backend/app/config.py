@@ -9,6 +9,8 @@ class Settings(BaseSettings):
     mongo_db: str = "selenet"
     rabbitmq_url: str = "amqp://guest:guest@rabbitmq:5672/"
     packet_queue_name: str = "packets.priority"
+    packet_queue_prefix: str = "packets"
+    default_node_id: str = "EARTH_GATEWAY"
     status_exchange_name: str = "status.updates"
     rabbitmq_max_priority: int = 10
     retry_scan_interval_seconds: float = 5.0
