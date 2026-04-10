@@ -23,6 +23,24 @@ docker compose up --build
 - Backend docs: http://localhost:8000/docs (kompat) lub http://localhost:8001/docs
 - RabbitMQ panel: http://localhost:15672 (guest/guest)
 
+## Frontend Hot Reload (Docker)
+
+Frontend jest skonfigurowany pod live reload w kontenerze (bind mount + polling Vite).
+
+Po zmianach w plikach frontend uruchom:
+
+```bash
+docker compose up -d --build frontend
+```
+
+Podglad logow frontendu:
+
+```bash
+docker compose logs -f frontend
+```
+
+Jesli przegladarka trzyma stary bundle, zrob twarde odswiezenie (`Cmd+Shift+R`).
+
 ## Jak odpalic wszystkich workerow (dokladnie o to pytales)
 
 Masz dwa najczestsze warianty:

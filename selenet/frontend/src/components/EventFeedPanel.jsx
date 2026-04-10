@@ -11,7 +11,7 @@ function statusColor(status) {
     return "warning";
   }
   if (normalized.includes("CANCELLED")) {
-    return "dark";
+    return "danger";
   }
   if (normalized.includes("DELIVERED")) {
     return "success";

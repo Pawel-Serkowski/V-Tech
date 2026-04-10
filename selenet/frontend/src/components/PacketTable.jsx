@@ -27,7 +27,7 @@ function statusColor(status) {
     return "warning";
   }
   if (status.includes("CANCELLED")) {
-    return "dark";
+    return "danger";
   }
   if (status.includes("DELIVERED")) {
     return "success";

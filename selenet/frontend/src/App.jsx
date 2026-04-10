@@ -220,7 +220,11 @@ export default function App() {
                     Monitor routing, dispatch packet traffic, and manage object definitions from dedicated views.
                   </p>
                 </div>
-                <CBadge color={streamOnline ? "success" : "warning"} shape="rounded-pill" className="px-3 py-2">
+                <CBadge
+                  color={streamOnline ? "success" : "warning"}
+                  shape="rounded-pill"
+                  className={`px-3 py-2 stream-badge ${streamOnline ? "is-online" : "is-reconnecting"}`}
+                >
                   Stream {streamOnline ? "Online" : "Reconnecting"}
                 </CBadge>
               </CCardBody>
