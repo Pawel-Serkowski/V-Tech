@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="pl">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Kosmiczne 3D</title>
+    <script type="module" src="/src/main.js"></script>
+  </head>
+  <body>
+    <div id="app">
+      <nav class="topbar">
+        <div class="brand">
+          <p class="eyebrow">Kosmiczne 3D</p>
+          <strong>Symulatory orbitalne</strong>
+        </div>
+        <div class="tabs">
+          <button class="tab is-active" data-tab="network">Siec Satelit</button>
+          <button class="tab" data-tab="planner">Optymalizator Delta-V</button>
+        </div>
+      </nav>
+
+      <section class="view is-active" data-view="network">
+        <div class="canvas-host" data-canvas-host="network"></div>
+
+        <aside class="mqtt-card">
+          <p class="card-eyebrow">MQTT laser link</p>
+          <h2>Siec transmisji</h2>
+          <div class="card-meta" data-mqtt-topic>Temat: mqtt/relay/idle</div>
+          <p class="card-description" data-mqtt-route>Trasa: oczekiwanie na aktywna sciezke</p>
+          <p class="card-description" data-mqtt-payload>Payload: brak aktywnych pakietow</p>
+          <div class="card-hint" data-mqtt-status>Status: broker gotowy</div>
+        </aside>
+
+        <div class="help">
+          <span>Obrot: przeciagnij</span>
+          <span>Zoom: scroll</span>
+          <span>Klik: wybor satelity</span>
+        </div>
+      </section>
+
+      <section class="view" data-view="planner">
+        <div class="canvas-host" data-canvas-host="planner"></div>
+
+        <div class="hud planner-hud">
+          <div>
+            <p class="eyebrow">Uklad Sloneczny 3D</p>
+            <h1>Optymalizator LEO do TLI</h1>
+            <p class="description">
+              Osobna scena z pelnym kontekstem planet, orbitami wokol Slonca i wyrazna
+              wizualizacja transferu Ziemia-Ksiezyc. Optymalizator szuka manewru TLI z orbity LEO.
+            </p>
+          </div>
+          <div class="legend">
+            <div><span class="dot burn"></span> Slonce</div>
+            <div><span class="dot earth"></span> Ziemia</div>
+            <div><span class="dot moon"></span> Ksiezyc</div>
+            <div><span class="dot transfer"></span> Trajektoria TLI</div>
+            <div><span class="dot laser"></span> Orbity planet</div>
+          </div>
+        </div>
+
+        <aside class="planner-card">
+          <p class="card-eyebrow">Parametry manewru</p>
+          <h2>Optymalizator</h2>
+          <label class="field">
+            <span>LEO wysokosc [km]</span>
+            <input data-planner-input="leo-altitude" type="range" min="160" max="450" value="185" />
+            <strong data-planner-value="leo-altitude">185 km</strong>
+          </label>
+          <label class="field">
+            <span>Czas lotu [dni]</span>
+            <input data-planner-input="flight-days" type="range" min="3.0" max="6.5" step="0.1" value="4.2" />
+            <strong data-planner-value="flight-days">4.2 dni</strong>
+          </label>
+          <label class="field">
+            <span>Docelowa wysokosc perilune [km]</span>
+            <input data-planner-input="perilune" type="range" min="80" max="300" value="110" />
+            <strong data-planner-value="perilune">110 km</strong>
+          </label>
+          <button class="action-button" data-planner-run>Przelicz trajektorie</button>
+          <div class="planner-note" data-planner-note>
+            Model: planeta po planecie w scenie heliocentrycznej, a transfer TLI liczony w ukladzie Ziemia-Ksiezyc.
+          </div>
+        </aside>
+
+        <aside class="results-card">
+          <p class="card-eyebrow">Wyniki</p>
+          <h2 data-planner-title>Transfer translunarny</h2>
+          <div class="stats">
+            <div><span>Delta-v TLI</span><strong data-result="delta-v">-</strong></div>
+            <div><span>Predkosc C3-ish</span><strong data-result="vinf">-</strong></div>
+            <div><span>Closest approach</span><strong data-result="closest">-</strong></div>
+            <div><span>Czas lotu</span><strong data-result="tof">-</strong></div>
+          </div>
+          <p class="card-description" data-result="summary">
+            Uruchom optymalizator, aby policzyc impuls i wyswietlic trajektorie translunarna.
+          </p>
+          <div class="card-hint" data-result="status">Status: gotowy do analizy</div>
+        </aside>
+
+          <div class="help">
+            <span>Obrot: przeciagnij</span>
+            <span>Zoom: scroll</span>
+            <span>Widok: planety plus korytarz Ziemia-Ksiezyc</span>
+          </div>
+        </section>
+    </div>
+  </body>
+</html>
