@@ -8,6 +8,10 @@ import os
 from CNN import SatelliteCloudCNN
 from DataSet import Cloud95Dataset 
 
+from size_acc import get_model_size, evaluate_accuracy
+
+from confusion_matrix import show_confusion_matrix
+
 # --- KONFIGURACJA ---
 TARGET_ACCURACY = 0.91  # Nasz cel: 91%
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -137,3 +141,29 @@ torch.save(model_int8.state_dict(), "cloud_model_int8.pth")
 
 
 print("\nGotowe. Model odchudzony, skuteczny i zapisany!")
+
+
+######### Opcjonalne wyipsanie macierzy pomyłek dla obu modeli #########
+
+# show_confusion_matrix(model_int8, dataloader, DEVICE) # Dla skwantowanego
+# show_confusion_matrix(model, dataloader, DEVICE)      # Dla zwykłego
+
+# print("\n" + "="*40)
+# print("RAPORT KOŃCOWY: PORÓWNANIE MODELI")
+# print("="*40)
+
+# # 1. Sprawdzamy oryginalny model (ten po pruningu, ale przed kwantyzacją)
+# # Zakładam, że w zmiennej 'model' masz nadal ten zwykły model
+# print("\n--- MODEL BAZOWY (Float32) ---")
+# get_model_size(model, "Zwykły Model (Float32)")
+# evaluate_accuracy(model, dataloader, device)
+
+# # 2. Sprawdzamy model skwantyzowany (ten ultralekki)
+# # Zakładam, że w zmiennej 'model_int8' masz model po kwantyzacji
+# # Pamiętaj, że model skwantyzowany działa tylko na CPU!
+# print("\n--- MODEL SKWANTYZOWANY (Int8) ---")
+# get_model_size(model_int8, "Skwantyzowany Model (Int8)")
+# evaluate_accuracy(model_int8, dataloader, torch.device('cpu'))
+
+# # 3. Na koniec pokazujemy macierz pomyłek dla najlepszego/wybranego modelu
+# # show_confusion_matrix(model_int8, dataloader, torch.device('cpu'))
