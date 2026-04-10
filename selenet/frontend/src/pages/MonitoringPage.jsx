@@ -4,7 +4,15 @@ import EventFeedPanel from "../components/EventFeedPanel";
 import PacketTable from "../components/PacketTable";
 import QueueLoadPanel from "../components/QueueLoadPanel";
 
-export default function MonitoringPage({ metrics, packets, queueLoad, events, loadingPackets }) {
+export default function MonitoringPage({
+  metrics,
+  packets,
+  queueLoad,
+  events,
+  loadingPackets,
+  onCancelPacket,
+  cancellingPacketIds,
+}) {
   return (
     <>
       <CRow className="g-3 mb-4">
@@ -44,7 +52,12 @@ export default function MonitoringPage({ metrics, packets, queueLoad, events, lo
 
       <CRow className="g-4">
         <CCol xl={8}>
-          <PacketTable packets={packets} loading={loadingPackets} />
+          <PacketTable
+            packets={packets}
+            loading={loadingPackets}
+            onCancelPacket={onCancelPacket}
+            cancellingPacketIds={cancellingPacketIds}
+          />
         </CCol>
         <CCol xl={4}>
           <QueueLoadPanel queueLoad={queueLoad} />

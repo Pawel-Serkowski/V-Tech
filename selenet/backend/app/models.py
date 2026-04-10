@@ -100,6 +100,8 @@ class PacketSummary(BaseModel):
     destination_node: str
     priority: int
     current_status: str
+    cancel_requested: bool = False
+    cancel_requested_at: datetime | None = None
     next_hop: str | None = None
     route_hops: list[str] = Field(default_factory=list)
     earth_timestamp: datetime

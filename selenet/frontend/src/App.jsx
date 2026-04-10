@@ -13,6 +13,7 @@ import {
 
 import {
   WS_STATUS_URL,
+  cancelPacket,
   createPacket,
   fetchNodes,
   fetchPackets,
@@ -33,6 +34,7 @@ export default function App() {
   const [queueLoad, setQueueLoad] = useState([]);
   const [nodes, setNodes] = useState([]);
   const [events, setEvents] = useState([]);
+  const [cancellingPacketIds, setCancellingPacketIds] = useState([]);
   const [loadingPackets, setLoadingPackets] = useState(true);
   const [loadingNodes, setLoadingNodes] = useState(true);
   const [message, setMessage] = useState("");
@@ -157,6 +159,27 @@ export default function App() {
     }
   }, [refreshNodes]);
 
+  const handleCancelPacket = useCallback(async (packetId) => {
+    setError("");
+    setMessage("");
+
+    setCancellingPacketIds((current) =>
+      current.includes(packetId) ? current : [...current, packetId]
+    );
+
+    try {
+      await cancelPacket(packetId);
+      setMessage(`Cancellation requested for packet ${packetId}. Waiting for backend status update.`);
+      await refreshTelemetry();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setCancellingPacketIds((current) =>
+        current.filter((currentId) => currentId !== packetId)
+      );
+    }
+  }, [refreshTelemetry]);
+
   const handleSaveNodes = async (payloadNodes) => {
     setError("");
     setMessage("");
@@ -239,6 +262,8 @@ export default function App() {
                 queueLoad={queueLoad}
                 events={events}
                 loadingPackets={loadingPackets}
+                cancellingPacketIds={cancellingPacketIds}
+                onCancelPacket={handleCancelPacket}
               />
             )}
           />
@@ -250,6 +275,8 @@ export default function App() {
                 packets={packets}
                 events={events}
                 loadingPackets={loadingPackets}
+                cancellingPacketIds={cancellingPacketIds}
+                onCancelPacket={handleCancelPacket}
               />
             )}
           />
