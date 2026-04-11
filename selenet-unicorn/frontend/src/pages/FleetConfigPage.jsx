@@ -18,6 +18,7 @@ function emptyEditor() {
     surface_lon_deg: "",
     location_label: "",
     links: "",
+    link_bandwidth_bps: "1048576",
   };
 }
 
@@ -47,17 +48,8 @@ function sanitizeNodeInput(editor) {
     surface_lat_deg: toNumberOrNull(editor.surface_lat_deg),
     surface_lon_deg: toNumberOrNull(editor.surface_lon_deg),
     location_label: String(editor.location_label || "").trim() || null,
-    links: String(editor.links || "")
-      .split(",")
-      .map((item) => item.trim())
-      .filter(Boolean),
-    contact_windows: [],
-  };
-
-  if (node.surface_lat_deg === null && node.surface_lon_deg !== null) {
-    throw new Error("surface_lat_deg i surface_lon_deg musza byc podane razem.");
-  }
-
+      link_bandwidth_bps: toNumberOrNull(editor.link_bandwidth_bps) ?? 1048576,
+    };
   if (node.surface_lat_deg !== null && node.surface_lon_deg === null) {
     throw new Error("surface_lat_deg i surface_lon_deg musza byc podane razem.");
   }
@@ -77,9 +69,9 @@ function toEditor(node) {
     surface_lat_deg: node.surface_lat_deg ?? "",
     surface_lon_deg: node.surface_lon_deg ?? "",
     location_label: node.location_label || "",
-    links: Array.isArray(node.links) ? node.links.join(", ") : "",
-  };
-}
+      link_bandwidth_bps: node.link_bandwidth_bps ?? "1048576",
+    };
+  }
 
 function inferOrbitalBody(node) {
   const orbitingBody = String(node?.orbiting_body || "").toLowerCase();
@@ -529,6 +521,15 @@ export default function FleetConfigPage({ nodes, loadingNodes, onSaveNodes, onUp
                 />
               </label>
             </div>
+
+            <label>
+              <span>link_bandwidth_bps</span>
+              <input
+                type="number"
+                value={editor.link_bandwidth_bps}
+                onChange={(event) => setEditor((current) => ({ ...current, link_bandwidth_bps: event.target.value }))}
+              />
+            </label>
 
             <label>
               <span>links (comma separated)</span>

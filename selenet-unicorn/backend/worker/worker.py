@@ -342,6 +342,7 @@ async def _process_message(
             now=now,
             ttl_remaining_seconds=ttl_remaining,
             hop_limit_remaining=hop_limit_remaining,
+            size_bytes=envelope.get("size_bytes", 1024),
         )
 
         if not next_hop:
@@ -366,7 +367,8 @@ async def _process_message(
             )
             return
 
-        hop_delay_seconds = compute_hop_delay_seconds(current_node, next_hop, nodes)
+        packet_size_bytes = envelope.get("size_bytes", 1024)
+        hop_delay_seconds = compute_hop_delay_seconds(current_node, next_hop, nodes, packet_size_bytes=packet_size_bytes)
         hop_total = hop_index + len(route_hops)
 
         await _notify_backend(

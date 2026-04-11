@@ -115,6 +115,7 @@ async def ingest_packet(packet: PacketCreate) -> PacketAck:
         destination_node=packet.destination_node,
         nodes=nodes,
         earth_timestamp=earth_timestamp,
+        size_bytes=packet.size_bytes,
         ttl_seconds=packet.ttl_seconds,
         hop_limit=packet.hop_limit,
     )
@@ -144,6 +145,7 @@ async def ingest_packet(packet: PacketCreate) -> PacketAck:
         "source_node": packet.source_node,
         "destination_node": packet.destination_node,
         "priority": int(packet.priority),
+        "size_bytes": packet.size_bytes,
         "payload": packet.payload,
         "earth_timestamp": earth_timestamp,
         "ttl_seconds": packet.ttl_seconds,
@@ -164,6 +166,7 @@ async def ingest_packet(packet: PacketCreate) -> PacketAck:
         "packet_id": packet_id,
         "source_node": packet.source_node,
         "destination_node": packet.destination_node,
+        "size_bytes": packet.size_bytes,
         "current_node": packet.source_node,
         "hop_index": 0,
         "hop_limit": packet.hop_limit,

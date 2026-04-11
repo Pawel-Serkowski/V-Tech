@@ -30,6 +30,7 @@ def pick_next_hop(
     now: datetime,
     ttl_remaining_seconds: int,
     hop_limit_remaining: int,
+    size_bytes: int = 1024,
 ) -> tuple[str | None, list[str]]:
     if ttl_remaining_seconds <= 0 or hop_limit_remaining <= 0:
         return None, []
@@ -39,6 +40,7 @@ def pick_next_hop(
         destination_node=destination_node,
         nodes=nodes,
         earth_timestamp=now,
+        size_bytes=size_bytes,
         ttl_seconds=ttl_remaining_seconds,
         hop_limit=hop_limit_remaining,
     )

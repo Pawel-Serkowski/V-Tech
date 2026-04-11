@@ -35,6 +35,7 @@ export default function DispatchPage({
   const [sourceNode, setSourceNode] = useState("");
   const [destinationNode, setDestinationNode] = useState("");
   const [priority, setPriority] = useState("2");
+  const [sizeBytes, setSizeBytes] = useState(1024);
   const [payloadText, setPayloadText] = useState(safeJsonStringify(PAYLOAD_TEMPLATES.healthcheck));
   const [localError, setLocalError] = useState("");
   const [sending, setSending] = useState(false);
@@ -118,6 +119,7 @@ export default function DispatchPage({
         source_node: sourceNode,
         destination_node: destinationNode,
         priority: Number(priority),
+        size_bytes: Number(sizeBytes),
         payload,
       });
     } catch (error) {
@@ -177,6 +179,17 @@ export default function DispatchPage({
                   <option value="2">2 - High</option>
                   <option value="3">3 - Bulk</option>
                 </select>
+              </label>
+
+              <label>
+                <span>Rozmiar (B)</span>
+                <input
+                  type="number"
+                  min="1"
+                  value={sizeBytes}
+                  onChange={(event) => setSizeBytes(event.target.value)}
+                  disabled={loadingNodes}
+                />
               </label>
             </div>
 
