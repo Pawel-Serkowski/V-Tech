@@ -53,3 +53,7 @@ env/
 # OS specific
 .DS_Store
 Thumbs.db
+
+# Node.js
+node_modules/
+**/node_modules/
