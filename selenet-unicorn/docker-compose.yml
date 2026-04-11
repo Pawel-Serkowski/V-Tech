@@ -1,6 +1,23 @@
 name: selenet-unicorn
-
 services:
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      target: dev
+    container_name: selenet-frontend-v2
+    ports:
+    - 5173:5173
+    environment:
+      CHOKIDAR_USEPOLLING: 'true'
+      CHOKIDAR_INTERVAL: '250'
+      WATCHPACK_POLLING: 'true'
+    volumes:
+    - ./frontend:/app
+    - /app/node_modules
+    depends_on:
+    - backend
+    restart: on-failure
   backend:
     build:
       context: ./selenet-backend
@@ -15,17 +32,16 @@ services:
       RABBITMQ_MAX_PRIORITY: 10
       STATUS_EXCHANGE_NAME: status.updates
       DISPATCH_ORIGIN_SCOPE: earth
-      DISPATCH_ORIGIN_NODE_ID: ""
-      DISPATCH_ALLOWED_SOURCE_NODE_IDS: ""
+      DISPATCH_ORIGIN_NODE_ID: ''
+      DISPATCH_ALLOWED_SOURCE_NODE_IDS: ''
       SERVICE_LOCATION: Earth Mission Control
-      CORS_ORIGINS: "*"
+      CORS_ORIGINS: '*'
     ports:
-      - "8002:8000"
+    - 8002:8000
     depends_on:
-      - rabbitmq
-      - mongo
+    - rabbitmq
+    - mongo
     restart: on-failure
-
   worker_earth_gateway:
     build:
       context: ./selenet-backend
@@ -42,10 +58,9 @@ services:
       RETRY_REQUEUE_SECONDS: 2
       SIMULATION_TIME_SCALE: 1.0
     depends_on:
-      - backend
-      - rabbitmq
+    - backend
+    - rabbitmq
     restart: on-failure
-
   worker_sat_1:
     build:
       context: ./selenet-backend
@@ -54,18 +69,16 @@ services:
     container_name: selenet-worker-v2-sat-1
     environment:
       NODE_ID: SAT_1
-      NODE_LOCATION: Earth-Moon Transfer Orbit
       RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
       PACKET_QUEUE_PREFIX: packets
       BACKEND_BASE_URL: http://backend:8000
-      RABBITMQ_MAX_PRIORITY: 10
-      RETRY_REQUEUE_SECONDS: 2
-      SIMULATION_TIME_SCALE: 1.0
+      RABBITMQ_MAX_PRIORITY: '10'
+      RETRY_REQUEUE_SECONDS: '2'
+      SIMULATION_TIME_SCALE: '1.0'
     depends_on:
-      - backend
-      - rabbitmq
+    - backend
+    - rabbitmq
     restart: on-failure
-
   worker_lunar_gateway:
     build:
       context: ./selenet-backend
@@ -82,27 +95,258 @@ services:
       RETRY_REQUEUE_SECONDS: 2
       SIMULATION_TIME_SCALE: 1.0
     depends_on:
-      - backend
-      - rabbitmq
+    - backend
+    - rabbitmq
     restart: on-failure
-
   rabbitmq:
     image: rabbitmq:3.13-management
     container_name: selenet-rabbitmq-v2
     ports:
-      - "5673:5672"
-      - "15673:15672"
+    - 5673:5672
+    - 15673:15672
     volumes:
-      - rabbitmq_data_v2:/var/lib/rabbitmq
-
+    - rabbitmq_data_v2:/var/lib/rabbitmq
   mongo:
     image: mongo:7
     container_name: selenet-mongo-v2
     ports:
-      - "27018:27017"
+    - 27018:27017
     volumes:
-      - mongo_data_v2:/data/db
-
+    - mongo_data_v2:/data/db
+  worker_estrack_pl:
+    build:
+      context: ./selenet-backend
+      dockerfile: Dockerfile
+      target: worker
+    container_name: selenet-worker-v2-estrack-pl
+    environment:
+      NODE_ID: ESTRACK_PL
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
+      PACKET_QUEUE_PREFIX: packets
+      BACKEND_BASE_URL: http://backend:8000
+      RABBITMQ_MAX_PRIORITY: '10'
+      RETRY_REQUEUE_SECONDS: '2'
+      SIMULATION_TIME_SCALE: '1.0'
+    depends_on:
+    - backend
+    - rabbitmq
+    restart: on-failure
+  worker_gs_cancel_test:
+    build:
+      context: ./selenet-backend
+      dockerfile: Dockerfile
+      target: worker
+    container_name: selenet-worker-v2-gs-cancel-test
+    environment:
+      NODE_ID: GS_CANCEL_TEST
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
+      PACKET_QUEUE_PREFIX: packets
+      BACKEND_BASE_URL: http://backend:8000
+      RABBITMQ_MAX_PRIORITY: '10'
+      RETRY_REQUEUE_SECONDS: '2'
+      SIMULATION_TIME_SCALE: '1.0'
+    depends_on:
+    - backend
+    - rabbitmq
+    restart: on-failure
+  worker_gs_test:
+    build:
+      context: ./selenet-backend
+      dockerfile: Dockerfile
+      target: worker
+    container_name: selenet-worker-v2-gs-test
+    environment:
+      NODE_ID: GS_TEST
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
+      PACKET_QUEUE_PREFIX: packets
+      BACKEND_BASE_URL: http://backend:8000
+      RABBITMQ_MAX_PRIORITY: '10'
+      RETRY_REQUEUE_SECONDS: '2'
+      SIMULATION_TIME_SCALE: '1.0'
+    depends_on:
+    - backend
+    - rabbitmq
+    restart: on-failure
+  worker_luna_orbiter_a:
+    build:
+      context: ./selenet-backend
+      dockerfile: Dockerfile
+      target: worker
+    container_name: selenet-worker-v2-luna-orbiter-a
+    environment:
+      NODE_ID: LUNA_ORBITER_A
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
+      PACKET_QUEUE_PREFIX: packets
+      BACKEND_BASE_URL: http://backend:8000
+      RABBITMQ_MAX_PRIORITY: '10'
+      RETRY_REQUEUE_SECONDS: '2'
+      SIMULATION_TIME_SCALE: '1.0'
+    depends_on:
+    - backend
+    - rabbitmq
+    restart: on-failure
+  worker_luna_relay_b:
+    build:
+      context: ./selenet-backend
+      dockerfile: Dockerfile
+      target: worker
+    container_name: selenet-worker-v2-luna-relay-b
+    environment:
+      NODE_ID: LUNA_RELAY_B
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
+      PACKET_QUEUE_PREFIX: packets
+      BACKEND_BASE_URL: http://backend:8000
+      RABBITMQ_MAX_PRIORITY: '10'
+      RETRY_REQUEUE_SECONDS: '2'
+      SIMULATION_TIME_SCALE: '1.0'
+    depends_on:
+    - backend
+    - rabbitmq
+    restart: on-failure
+  worker_no_worker_src:
+    build:
+      context: ./selenet-backend
+      dockerfile: Dockerfile
+      target: worker
+    container_name: selenet-worker-v2-no-worker-src
+    environment:
+      NODE_ID: NO_WORKER_SRC
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
+      PACKET_QUEUE_PREFIX: packets
+      BACKEND_BASE_URL: http://backend:8000
+      RABBITMQ_MAX_PRIORITY: '10'
+      RETRY_REQUEUE_SECONDS: '2'
+      SIMULATION_TIME_SCALE: '1.0'
+    depends_on:
+    - backend
+    - rabbitmq
+    restart: on-failure
+  worker_sat_2:
+    build:
+      context: ./selenet-backend
+      dockerfile: Dockerfile
+      target: worker
+    container_name: selenet-worker-v2-sat-2
+    environment:
+      NODE_ID: SAT_2
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
+      PACKET_QUEUE_PREFIX: packets
+      BACKEND_BASE_URL: http://backend:8000
+      RABBITMQ_MAX_PRIORITY: '10'
+      RETRY_REQUEUE_SECONDS: '2'
+      SIMULATION_TIME_SCALE: '1.0'
+    depends_on:
+    - backend
+    - rabbitmq
+    restart: on-failure
+  worker_sat_cancel_dst:
+    build:
+      context: ./selenet-backend
+      dockerfile: Dockerfile
+      target: worker
+    container_name: selenet-worker-v2-sat-cancel-dst
+    environment:
+      NODE_ID: SAT_CANCEL_DST
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
+      PACKET_QUEUE_PREFIX: packets
+      BACKEND_BASE_URL: http://backend:8000
+      RABBITMQ_MAX_PRIORITY: '10'
+      RETRY_REQUEUE_SECONDS: '2'
+      SIMULATION_TIME_SCALE: '1.0'
+    depends_on:
+    - backend
+    - rabbitmq
+    restart: on-failure
+  worker_sat_cancel_r1:
+    build:
+      context: ./selenet-backend
+      dockerfile: Dockerfile
+      target: worker
+    container_name: selenet-worker-v2-sat-cancel-r1
+    environment:
+      NODE_ID: SAT_CANCEL_R1
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
+      PACKET_QUEUE_PREFIX: packets
+      BACKEND_BASE_URL: http://backend:8000
+      RABBITMQ_MAX_PRIORITY: '10'
+      RETRY_REQUEUE_SECONDS: '2'
+      SIMULATION_TIME_SCALE: '1.0'
+    depends_on:
+    - backend
+    - rabbitmq
+    restart: on-failure
+  worker_sat_cancel_r2:
+    build:
+      context: ./selenet-backend
+      dockerfile: Dockerfile
+      target: worker
+    container_name: selenet-worker-v2-sat-cancel-r2
+    environment:
+      NODE_ID: SAT_CANCEL_R2
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
+      PACKET_QUEUE_PREFIX: packets
+      BACKEND_BASE_URL: http://backend:8000
+      RABBITMQ_MAX_PRIORITY: '10'
+      RETRY_REQUEUE_SECONDS: '2'
+      SIMULATION_TIME_SCALE: '1.0'
+    depends_on:
+    - backend
+    - rabbitmq
+    restart: on-failure
+  worker_sat_dst:
+    build:
+      context: ./selenet-backend
+      dockerfile: Dockerfile
+      target: worker
+    container_name: selenet-worker-v2-sat-dst
+    environment:
+      NODE_ID: SAT_DST
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
+      PACKET_QUEUE_PREFIX: packets
+      BACKEND_BASE_URL: http://backend:8000
+      RABBITMQ_MAX_PRIORITY: '10'
+      RETRY_REQUEUE_SECONDS: '2'
+      SIMULATION_TIME_SCALE: '1.0'
+    depends_on:
+    - backend
+    - rabbitmq
+    restart: on-failure
+  worker_sat_r1:
+    build:
+      context: ./selenet-backend
+      dockerfile: Dockerfile
+      target: worker
+    container_name: selenet-worker-v2-sat-r1
+    environment:
+      NODE_ID: SAT_R1
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
+      PACKET_QUEUE_PREFIX: packets
+      BACKEND_BASE_URL: http://backend:8000
+      RABBITMQ_MAX_PRIORITY: '10'
+      RETRY_REQUEUE_SECONDS: '2'
+      SIMULATION_TIME_SCALE: '1.0'
+    depends_on:
+    - backend
+    - rabbitmq
+    restart: on-failure
+  worker_sat_r2:
+    build:
+      context: ./selenet-backend
+      dockerfile: Dockerfile
+      target: worker
+    container_name: selenet-worker-v2-sat-r2
+    environment:
+      NODE_ID: SAT_R2
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
+      PACKET_QUEUE_PREFIX: packets
+      BACKEND_BASE_URL: http://backend:8000
+      RABBITMQ_MAX_PRIORITY: '10'
+      RETRY_REQUEUE_SECONDS: '2'
+      SIMULATION_TIME_SCALE: '1.0'
+    depends_on:
+    - backend
+    - rabbitmq
+    restart: on-failure
 volumes:
-  rabbitmq_data_v2:
-  mongo_data_v2:
+  rabbitmq_data_v2: null
+  mongo_data_v2: null

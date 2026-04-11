@@ -11,6 +11,10 @@ from app.models import NodeConfig, NodeUploadRequest
 router = APIRouter()
 
 
+import math
+from app.cgr import resolve_node_position
+from app.config import get_settings
+
 def _serialize_node(node: dict[str, Any]) -> dict[str, Any]:
     node.pop("_id", None)
     windows: list[dict[str, Any]] = []
@@ -24,6 +28,28 @@ def _serialize_node(node: dict[str, Any]) -> dict[str, Any]:
             }
         )
     node["contact_windows"] = windows
+
+    # Calculate and inject actual position and altitude
+    pos = resolve_node_position(node)
+    if pos is not None:
+        node["actual_position_x_km"] = pos.x
+        node["actual_position_y_km"] = pos.y
+        node["actual_position_z_km"] = pos.z
+
+        body_name = node.get("body") or node.get("orbiting_body")
+        settings = get_settings()
+        if body_name and isinstance(body_name, str):
+            body = settings.planetary_bodies.get(body_name.lower())
+            if body:
+                center = body["center"]
+                radius = body["radius_km"]
+                dist = math.dist((pos.x, pos.y, pos.z), center)
+                node["altitude_km"] = max(0.0, dist - radius)
+        elif node.get("orbit_altitude_km") is not None:
+            node["altitude_km"] = node["orbit_altitude_km"]
+        else:
+            node["altitude_km"] = 0.0
+
     return node
 
 

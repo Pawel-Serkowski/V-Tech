@@ -4,6 +4,7 @@ Ta wersja zawiera nowy backend (v2) oraz wspolny plik compose na poziomie katalo
 
 ## Struktura
 
+- `frontend/` - nowy frontend React/Vite (dashboard, pakiety, dispatch, flota, wizualizacja).
 - `selenet-backend/` - kod aplikacji backendowej i workerow.
 - `docker-compose.yml` - wspolny punkt uruchamiania calego stosu.
 
@@ -23,6 +24,21 @@ W `docker-compose.yml` serwis `backend` buduje target `backend`,
 a serwisy workerow buduja target `worker` z tego samego Dockerfile.
 
 ## Serwisy w docker-compose
+
+### frontend
+
+Frontend uruchamiany w compose w trybie developerskim (Vite + hot reload):
+
+- Dashboard operacyjny ze zwiezlymi statystykami,
+- Lista pakietow z filtrowaniem, paginacja i widokiem szczegolowym pipeline,
+- Strona konfiguracji floty (download/upload JSON + modal edycji satelity),
+- Strona dispatchu (manual + szablony + upload payload JSON),
+- Strona wizualizacji zsynchronizowana z tym samym strumieniem telemetrycznym co dashboard.
+
+Port hosta: `5173` (kontener: `5173`).
+
+Hot reload dziala przez bind mount `./frontend:/app` oraz polling watcherow (`CHOKIDAR_USEPOLLING=true`).
+Po edycji plikow w `frontend/src` przegladarka powinna odswiezyc widok automatycznie.
 
 ### backend
 
@@ -120,6 +136,14 @@ albo jawnie przez interpreter z Twojego venv:
 
 ```bash
 /Users/pawelserkowski/Desktop/V-Tech/.venv/bin/python -m pytest -q
+```
+
+Testy frontendu (z katalogu `selenet-unicorn/frontend`):
+
+```bash
+npm install
+npm run test:run
+npm run build
 ```
 
 ## Przygotowanie pod frontend w tym samym compose

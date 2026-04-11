@@ -147,14 +147,27 @@ def compute_hop_delay_seconds(
         for node in nodes
         if isinstance(node.get("node_id"), str)
     }
-    source = node_map.get(source_node_id)
-    destination = node_map.get(destination_node_id)
-    if not source or not destination:
+    source_node = node_map.get(source_node_id)
+    destination_node = node_map.get(destination_node_id)
+    if not source_node or not destination_node:
         return 1.0
 
-    distance = calculate_distance_km(source, destination)
+    if not line_of_sight_clear(source_node, destination_node):
+        return 1.0
+
+    distance = calculate_distance_km(source_node, destination_node)
     if distance is None:
-        return _heuristic_delay_seconds(source, destination)
+        return _heuristic_delay_seconds(source_node, destination_node)
+
+    source_type = source_node.get("node_type")
+    dest_type = destination_node.get("node_type")
+
+    # Enforce basic realism: Ground stations on Earth prefer routing through local relays/satellites.
+    # Block direct links > 100,000 km from ground stations.
+    if distance > 100000.0:
+        if (source_type == "ground_station" and dest_type != "ground_station") or \
+           (dest_type == "ground_station" and source_type != "ground_station"):
+            return 10.0 # Return a massive penalty instead of None so it falls back gracefully but isn't chosen if a better hop exists
 
     return max(0.01, distance / SPEED_OF_LIGHT_KM_S)
 
@@ -167,20 +180,24 @@ def calculate_distance_km(source_node: dict[str, Any], destination_node: dict[st
     return math.dist(source_position.as_tuple(), destination_position.as_tuple())
 
 
-def resolve_node_position(node: dict[str, Any]) -> Position3D | None:
+import time
+
+def resolve_node_position(node: dict[str, Any], current_time_ts: float | None = None) -> Position3D | None:
     direct_position = _extract_cartesian_position(node)
     if direct_position is not None:
         return Position3D(*direct_position)
 
     settings = get_settings()
     planetary_bodies = settings.planetary_bodies
+    
+    if current_time_ts is None:
+        current_time_ts = time.time()
 
     if (
         node.get("surface_lat_deg") is not None
         and node.get("surface_lon_deg") is not None
-        and isinstance(node.get("body"), str)
     ):
-        body_name = str(node["body"]).lower()
+        body_name = str(node.get("body") or "earth").lower()
         body = planetary_bodies.get(body_name)
         if body:
             return _surface_position(
@@ -190,15 +207,36 @@ def resolve_node_position(node: dict[str, Any]) -> Position3D | None:
                 lon_deg=float(node["surface_lon_deg"]),
             )
 
-    if node.get("orbit_altitude_km") is not None and isinstance(node.get("orbiting_body"), str):
-        body_name = str(node["orbiting_body"]).lower()
+    if node.get("orbit_altitude_km") is not None:
+        body_name = str(node.get("orbiting_body") or node.get("body") or "earth").lower()
         body = planetary_bodies.get(body_name)
         if body:
             orbital_radius = float(body["radius_km"]) + max(0.0, float(node.get("orbit_altitude_km", 0.0)))
+            
+            base_phase_deg = float(node.get("orbital_phase_deg", 0.0))
+            
+            # GM params for Kepler's 3rd law
+            gm_map = {
+                "earth": 398600.4418,
+                "moon": 4902.8000,
+            }
+            gm = gm_map.get(body_name)
+            
+            import os
+            # Dynamic movement
+            dynamic_phase = base_phase_deg
+            if gm and orbital_radius > 0:
+                mean_motion_rad_s = math.sqrt(gm / (orbital_radius ** 3))
+                mean_motion_deg_s = math.degrees(mean_motion_rad_s)
+                time_offset = node.get("time_offset_seconds") or 0
+                viz_multiplier = float(os.getenv("SIMULATION_TIME_SCALE", "60.0"))
+                elapsed_s = (current_time_ts + time_offset) * viz_multiplier
+                dynamic_phase = (base_phase_deg + (mean_motion_deg_s * elapsed_s)) % 360.0
+                
             return _orbital_position(
                 center=body["center"],
                 orbital_radius_km=orbital_radius,
-                phase_deg=float(node.get("orbital_phase_deg", 0.0)),
+                phase_deg=dynamic_phase,
                 inclination_deg=float(node.get("orbital_inclination_deg", 0.0)),
             )
 
@@ -346,6 +384,13 @@ def _collect_neighbors(
 
 
 def _is_better(candidate: tuple[float, float, int], current: tuple[float, float, int]) -> bool:
+    # candidate = (arrival_ts, distance, hops)
+    # Prefer MORE hops if it means shorter edge distances? 
+    # Actually, if we just want to force routing to closest satellites, 
+    # we can penalize total distance heavily if hops are few, 
+    # but the simplest way to enforce "nearest neighbor" topology 
+    # is to add a massive artificial 10-second penalty to any single link > 50,000 km in compute_hop_delay.
+    
     if candidate[0] < current[0] - TIME_EPSILON:
         return True
 
