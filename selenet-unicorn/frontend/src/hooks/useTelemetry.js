@@ -184,7 +184,11 @@ export function useTelemetry() {
     async (payloadNodes, options = {}) => {
       clearFeedback();
       const result = await uploadNodesJson(payloadNodes, options);
-      await Promise.all([refreshNodes(), refreshDispatch()]);
+      try {
+        await Promise.all([refreshNodes(), refreshDispatch()]);
+      } catch {
+        // Upload was successful; keep success message even if refresh fails transiently.
+      }
 
       const deleted = Number.isFinite(result?.deleted) ? result.deleted : 0;
       setMessage(
@@ -201,7 +205,11 @@ export function useTelemetry() {
     async (file, options = {}) => {
       clearFeedback();
       const result = await uploadNodesFile(file, options);
-      await Promise.all([refreshNodes(), refreshDispatch()]);
+      try {
+        await Promise.all([refreshNodes(), refreshDispatch()]);
+      } catch {
+        // Upload was successful; keep success message even if refresh fails transiently.
+      }
 
       setMessage(
         `${options.replace ? "Wgrano plik i podmieniono cala flote." : "Wgrano plik konfiguracyjny floty."} `

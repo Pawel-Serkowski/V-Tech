@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 const EARTH_RADIUS_KM = 6371;
 const MOON_RADIUS_KM = 1737.4;
@@ -143,6 +143,14 @@ export default function FleetConfigPage({ nodes, loadingNodes, onSaveNodes, onUp
 
   const sortedNodes = useMemo(() => [...nodes].sort((left, right) => left.node_id.localeCompare(right.node_id)), [nodes]);
 
+  useEffect(() => {
+    if (sortedNodes.length === 0) {
+      return;
+    }
+
+    setJsonText(JSON.stringify({ nodes: sortedNodes }, null, 2));
+  }, [sortedNodes]);
+
   const clearFeedback = () => {
     setLocalError("");
     setLocalMessage("");
@@ -208,6 +216,13 @@ export default function FleetConfigPage({ nodes, loadingNodes, onSaveNodes, onUp
 
     try {
       await onUploadNodesFile(file, { replace: replaceMode });
+      const uploadedText = await file.text();
+      try {
+        const parsed = JSON.parse(uploadedText);
+        setJsonText(JSON.stringify(Array.isArray(parsed) ? { nodes: parsed } : parsed, null, 2));
+      } catch {
+        // Ignore editor sync when uploaded file content is not valid JSON.
+      }
       setLocalMessage("Wgrano plik konfiguracji floty.");
     } catch (error) {
       setLocalError(error.message || "Nie udalo sie wgrac pliku floty.");

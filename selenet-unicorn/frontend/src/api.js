@@ -1,5 +1,5 @@
-export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8002";
-export const WS_STATUS_URL = import.meta.env.VITE_WS_URL || "ws://localhost:8002/ws/status";
+export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8006";
+export const WS_STATUS_URL = import.meta.env.VITE_WS_URL || "ws://localhost:8006/ws/status";
 
 async function parseResponse(response) {
   if (response.ok) {

@@ -7,11 +7,13 @@ services:
       target: dev
     container_name: selenet-frontend-v2
     ports:
-    - 5173:5173
+    - 5177:5173
     environment:
       CHOKIDAR_USEPOLLING: 'true'
       CHOKIDAR_INTERVAL: '250'
       WATCHPACK_POLLING: 'true'
+      VITE_API_BASE_URL: 'http://localhost:8006'
+      VITE_WS_URL: 'ws://localhost:8006/ws/status'
     volumes:
     - ./frontend:/app
     - /app/node_modules
@@ -39,7 +41,7 @@ services:
       SERVICE_LOCATION: Earth Mission Control
       CORS_ORIGINS: '*'
     ports:
-    - 8002:8000
+    - 8006:8000
     depends_on:
     - rabbitmq
     - mongo
@@ -104,15 +106,15 @@ services:
     image: rabbitmq:3.13-management
     container_name: selenet-rabbitmq-v2
     ports:
-    - 5673:5672
-    - 15673:15672
+    - 5676:5672
+    - 15676:15672
     volumes:
     - rabbitmq_data_v2:/var/lib/rabbitmq
   mongo:
     image: mongo:7
     container_name: selenet-mongo-v2
     ports:
-    - 27018:27017
+    - 27020:27017
     volumes:
     - mongo_data_v2:/data/db
   worker_estrack_pl:

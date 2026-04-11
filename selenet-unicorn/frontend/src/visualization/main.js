@@ -593,6 +593,11 @@ const BODY_WORLD_RADIUS_KM = {
   moon: 1737.4,
 };
 
+const BODY_MU = {
+  earth: 398600.4418,
+  moon: 4902.8001,
+};
+
 const BODY_SCENE_SURFACE_RADIUS = {
   earth: 2.08,
   moon: 0.76,
@@ -610,6 +615,63 @@ function fallbackDirection(nodeId) {
   ).normalize();
 }
 
+function computeAnimatedCartesianPosition(node, bodyId, elapsed = 0) {
+  const hasActualPosition =
+    Number.isFinite(Number(node?.actual_position_x_km)) &&
+    Number.isFinite(Number(node?.actual_position_y_km)) &&
+    Number.isFinite(Number(node?.actual_position_z_km));
+
+  // When backend streams actual positions, treat them as source of truth.
+  if (hasActualPosition) {
+    return null;
+  }
+
+  const px = Number(node?.position_x_km);
+  const py = Number(node?.position_y_km);
+  const pz = Number(node?.position_z_km);
+  if (!Number.isFinite(px) || !Number.isFinite(py) || !Number.isFinite(pz)) {
+    return null;
+  }
+
+  const center = BODY_WORLD_CENTER[bodyId];
+  const local = new THREE.Vector3(px - center.x, py - center.y, pz - center.z);
+  const radiusKm = local.length();
+  if (!Number.isFinite(radiusKm) || radiusKm < 1e-6) {
+    return null;
+  }
+
+  const worldRadiusKm = BODY_WORLD_RADIUS_KM[bodyId];
+  const sceneSurfaceRadius = BODY_SCENE_SURFACE_RADIUS[bodyId];
+  const radiusScene = THREE.MathUtils.clamp(
+    (radiusKm / worldRadiusKm) * sceneSurfaceRadius,
+    sceneSurfaceRadius + 0.06,
+    sceneSurfaceRadius * 6.8
+  );
+
+  const direction = hashNumber(String(node?.node_id ?? "sat"), 97) % 2 === 0 ? 1 : -1;
+  const inclinationDeg = Number(node?.orbital_inclination_deg ?? 0);
+
+  let orbitNormal = new THREE.Vector3(0, 1, 0);
+  if (Number.isFinite(inclinationDeg) && Math.abs(inclinationDeg) > 0.001) {
+    orbitNormal = new THREE.Vector3(0, 1, 0).applyAxisAngle(
+      new THREE.Vector3(1, 0, 0),
+      THREE.MathUtils.degToRad(inclinationDeg)
+    );
+  }
+
+  const physicalOmega = Math.sqrt(BODY_MU[bodyId] / Math.max(radiusKm ** 3, 1));
+  const visualScale = 2500;
+  const sceneOmega = getOrbitalAngularSpeed(radiusScene, bodyId, direction);
+  const angularSpeed = Math.max(physicalOmega * visualScale, Math.abs(sceneOmega) * 0.7) * direction;
+
+  local.applyAxisAngle(orbitNormal.normalize(), elapsed * angularSpeed);
+  return {
+    x: center.x + local.x,
+    y: center.y + local.y,
+    z: center.z + local.z,
+  };
+}
+
 function computeNodePlacement(node, network, elapsed = 0) {
   const bodyId = network === "moon" ? "moon" : "earth";
   const worldCenter = BODY_WORLD_CENTER[bodyId];
@@ -625,6 +687,15 @@ function computeNodePlacement(node, network, elapsed = 0) {
     resolvedX = fallback?.x ?? 0;
     resolvedY = fallback?.y ?? 0;
     resolvedZ = fallback?.z ?? 0;
+  }
+
+  if (!isBaseNode(node)) {
+    const animated = computeAnimatedCartesianPosition(node, bodyId, elapsed);
+    if (animated) {
+      resolvedX = animated.x;
+      resolvedY = animated.y;
+      resolvedZ = animated.z;
+    }
   }
 
   const local = new THREE.Vector3(
