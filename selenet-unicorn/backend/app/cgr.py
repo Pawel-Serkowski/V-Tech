@@ -40,6 +40,7 @@ class CGREngine:
         destination_node: str,
         nodes: list[dict[str, Any]],
         earth_timestamp: datetime,
+        size_bytes: int = 1024,
         ttl_seconds: int = 3600,
         hop_limit: int = 10,
     ) -> list[str] | None:
@@ -97,6 +98,7 @@ class CGREngine:
                 node_map=node_map,
                 current_time_ts=arrival_ts,
                 deadline_ts=deadline,
+                size_bytes=size_bytes,
             )
 
             for contact in contacts:
@@ -141,6 +143,7 @@ def compute_hop_delay_seconds(
     source_node_id: str,
     destination_node_id: str,
     nodes: list[dict[str, Any]],
+    packet_size_bytes: int = 1024,
 ) -> float:
     node_map = {
         node.get("node_id"): node
@@ -169,7 +172,12 @@ def compute_hop_delay_seconds(
            (dest_type == "ground_station" and source_type != "ground_station"):
             return 10.0 # Return a massive penalty instead of None so it falls back gracefully but isn't chosen if a better hop exists
 
-    return max(0.01, distance / SPEED_OF_LIGHT_KM_S)
+    transmission_delay = 0.0
+    link_bandwidth_bps = float(source_node.get("link_bandwidth_bps") or 1048576.0)
+    if link_bandwidth_bps > 0:
+        transmission_delay = (packet_size_bytes * 8) / link_bandwidth_bps
+
+    return max(0.01, (distance / SPEED_OF_LIGHT_KM_S) + transmission_delay)
 
 
 def calculate_distance_km(source_node: dict[str, Any], destination_node: dict[str, Any]) -> float | None:
@@ -288,6 +296,7 @@ def _build_contacts_for_source(
     node_map: dict[str, dict[str, Any]],
     current_time_ts: float,
     deadline_ts: float,
+    size_bytes: int = 1024,
 ) -> list[ContactOpportunity]:
     source_node = node_map.get(source_node_id)
     if source_node is None:
@@ -310,7 +319,13 @@ def _build_contacts_for_source(
         distance_km = calculate_distance_km(source_node, neighbor)
         if distance_km is None:
             distance_km = _heuristic_distance_km(source_node, neighbor)
-        delay_seconds = max(0.01, distance_km / SPEED_OF_LIGHT_KM_S)
+
+        transmission_delay = 0.0
+        link_bandwidth_bps = float(source_node.get("link_bandwidth_bps") or 1048576.0)
+        if link_bandwidth_bps > 0:
+            transmission_delay = (size_bytes * 8) / link_bandwidth_bps
+
+        delay_seconds = max(0.01, (distance_km / SPEED_OF_LIGHT_KM_S) + transmission_delay)
 
         for start_ts, end_ts in windows:
             opportunities.append(

@@ -105,8 +105,8 @@ def test_resolve_node_position_supports_orbital_and_surface_modes() -> None:
         "surface_lon_deg": 0.0,
     }
 
-    sat_pos = resolve_node_position(orbital)
-    gs_pos = resolve_node_position(surface)
+    sat_pos = resolve_node_position(orbital, current_time_ts=0.0)
+    gs_pos = resolve_node_position(surface, current_time_ts=0.0)
 
     assert sat_pos is not None
     assert gs_pos is not None

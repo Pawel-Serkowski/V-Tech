@@ -145,10 +145,9 @@ def test_node_config_self_link_removed() -> None:
 
 
 def test_contact_window_normalised_to_utc() -> None:
-    import pytz  # type: ignore[import]
-
-    tz_berlin = pytz.timezone("Europe/Berlin")
-    start = tz_berlin.localize(datetime(2026, 1, 1, 12, 0, 0))
+    from zoneinfo import ZoneInfo
+    tz_berlin = ZoneInfo("Europe/Berlin")
+    start = datetime(2026, 1, 1, 12, 0, 0, tzinfo=tz_berlin)
     end = start + timedelta(hours=1)
     window = ContactWindow(start=start, end=end)
     assert window.start.tzinfo.utcoffset(window.start).total_seconds() == 0

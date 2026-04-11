@@ -57,6 +57,7 @@ class NodeConfig(BaseModel):
     time_offset_seconds: int = 0
     contact_windows: list[ContactWindow] = Field(default_factory=list)
     links: list[str] = Field(default_factory=list)
+    link_bandwidth_bps: float | None = Field(default=1048576.0, ge=1.0)
 
     @field_validator("node_id")
     @classmethod
@@ -110,6 +111,7 @@ class PacketCreate(BaseModel):
     destination_node: str = Field(min_length=1)
     payload: dict[str, Any]
     priority: PacketPriority = PacketPriority.BULK
+    size_bytes: int = Field(default=1024, ge=1)
     ttl_seconds: int = Field(default=3600, ge=60, le=86400)
     hop_limit: int = Field(default=10, ge=1, le=50)
 
@@ -152,6 +154,7 @@ class PacketSummary(BaseModel):
     packet_id: str
     source_node: str
     destination_node: str
+    size_bytes: int = 1024
     priority: int
     current_status: str
     cancel_requested: bool = False
