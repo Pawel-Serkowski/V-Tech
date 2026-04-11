@@ -5,7 +5,7 @@ set -euo pipefail
 API_BASE_URL="${API_BASE_URL:-http://localhost:8001}"
 
 echo "[1/5] Uploading CLOSED windows so packet starts in WAITING_RETRY..."
-curl -sS -X POST "${API_BASE_URL}/api/nodes?replace=true" \
+curl -sS -X POST "${API_BASE_URL}/api/nodes" \
   -H 'Content-Type: application/json' \
   -d '{
     "nodes": [
@@ -15,9 +15,14 @@ curl -sS -X POST "${API_BASE_URL}/api/nodes?replace=true" \
         "orbit": "Earth Surface",
         "time_offset_seconds": 0,
         "location_label": "Earth Mission Control",
-        "links": ["SAT_1"],
-        "contact_windows": [
-          {"start": "2026-01-01T00:00:00Z", "end": "2026-01-01T00:00:30Z"}
+        "links": [
+          {
+            "dest_node": "SAT_1",
+            "bandwidth_bps": 1000000,
+            "windows": [
+              {"start": "2026-01-01T00:00:00Z", "end": "2026-01-01T00:00:30Z"}
+            ]
+          }
         ]
       },
       {
@@ -26,10 +31,7 @@ curl -sS -X POST "${API_BASE_URL}/api/nodes?replace=true" \
         "orbit": "NRHO",
         "time_offset_seconds": 2,
         "location_label": "NRHO Plane A",
-        "links": [],
-        "contact_windows": [
-          {"start": "2026-01-01T00:00:00Z", "end": "2026-01-01T00:00:30Z"}
-        ]
+        "links": []
       }
     ]
   }' > /tmp/selenet-retry-step1.json
@@ -52,7 +54,7 @@ echo "Packet ID: ${PACKET_ID}"
 
 echo
 echo "[3/5] Opening windows to trigger automatic retry engine..."
-curl -sS -X POST "${API_BASE_URL}/api/nodes?replace=true" \
+curl -sS -X POST "${API_BASE_URL}/api/nodes" \
   -H 'Content-Type: application/json' \
   -d '{
     "nodes": [
@@ -62,10 +64,15 @@ curl -sS -X POST "${API_BASE_URL}/api/nodes?replace=true" \
         "orbit": "Earth Surface",
         "time_offset_seconds": 0,
         "location_label": "Earth Mission Control",
-        "links": ["SAT_1"],
-        "contact_windows": [
-          {"start": "2026-01-01T00:00:00Z", "end": "2027-01-01T00:00:00Z"},
-          {"start": "2027-01-02T00:00:00Z", "end": "2027-01-02T02:00:00Z"}
+        "links": [
+          {
+            "dest_node": "SAT_1",
+            "bandwidth_bps": 1000000,
+            "windows": [
+              {"start": "2026-01-01T00:00:00Z", "end": "2027-01-01T00:00:00Z"},
+              {"start": "2027-01-02T00:00:00Z", "end": "2027-01-02T02:00:00Z"}
+            ]
+          }
         ]
       },
       {
@@ -74,11 +81,7 @@ curl -sS -X POST "${API_BASE_URL}/api/nodes?replace=true" \
         "orbit": "NRHO",
         "time_offset_seconds": 2,
         "location_label": "NRHO Plane A",
-        "links": [],
-        "contact_windows": [
-          {"start": "2026-01-01T00:00:00Z", "end": "2027-01-01T00:00:00Z"},
-          {"start": "2027-01-02T00:10:00Z", "end": "2027-01-02T03:00:00Z"}
-        ]
+        "links": []
       }
     ]
   }' > /tmp/selenet-retry-step3.json

@@ -2,12 +2,13 @@ import asyncio
 from datetime import datetime, timezone
 from typing import Any
 
-from app.cgr import CGREngine
-from app.config import get_settings
-from app.db import get_database
-from app.models import PacketPriority
-from app.rabbitmq import packet_queue_name_for_node, rabbit_publisher
-from app.websocket_manager import ws_manager
+from .cgr import CGREngine
+from .config import get_settings
+from .db import get_database
+from .models import PacketPriority
+from .rabbitmq import packet_queue_name_for_node, rabbit_publisher
+from .utils2 import estimate_packet_size, flatten_nodes_to_contact_plan
+from .websocket_manager import ws_manager
 
 
 def _to_rabbit_priority(priority_raw: Any) -> int:
@@ -110,12 +111,41 @@ class PacketRetryEngine:
         db = get_database()
         now = datetime.now(timezone.utc)
 
+        # Expire stale WAITING_RETRY packets before attempting re-routing.
+        await db.packets.update_many(
+            {
+                "current_status": "WAITING_RETRY",
+                "expire_at": {"$lte": now},
+            },
+            {
+                "$set": {
+                    "current_status": "FAILED_EXPIRED",
+                    "updated_at": now,
+                },
+                "$push": {
+                    "status_history": {
+                        "status": "FAILED_EXPIRED",
+                        "at": now,
+                        "detail": "Packet expired before a valid contact window opened.",
+                    }
+                },
+            },
+        )
+
         nodes = await db.nodes.find({}, {"_id": 0}).to_list(length=5000)
         if not nodes:
             return
+        contact_plan = flatten_nodes_to_contact_plan(nodes)
 
         waiting_packets = await db.packets.find(
-            {"current_status": "WAITING_RETRY"},
+            {
+                "current_status": "WAITING_RETRY",
+                "$or": [
+                    {"expire_at": {"$gt": now}},
+                    {"expire_at": {"$exists": False}},
+                    {"expire_at": None},
+                ],
+            },
             {
                 "_id": 0,
                 "packet_id": 1,
@@ -165,11 +195,14 @@ class PacketRetryEngine:
             if isinstance(expire_at, datetime):
                 remaining_ttl_seconds = max(1, int((expire_at - now).total_seconds()))
 
+            packet_size_bytes = estimate_packet_size(packet.get("payload", {}))
+
             route_hops = CGREngine.compute_route_hops(
                 source_node=packet["source_node"],
                 destination_node=packet["destination_node"],
-                nodes=nodes,
+                contact_plan=contact_plan,
                 earth_timestamp=now,
+                packet_size_bytes=packet_size_bytes,
                 ttl_seconds=remaining_ttl_seconds,
                 hop_limit=packet.get("hop_limit", 10),
             )

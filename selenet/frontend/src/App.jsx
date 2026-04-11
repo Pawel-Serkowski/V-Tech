@@ -193,15 +193,13 @@ export default function App() {
     }
   }, [refreshTelemetry]);
 
-  const handleSaveNodes = async (payloadNodes, options = {}) => {
+  const handleSaveNodes = async (payloadNodes) => {
     setError("");
     setMessage("");
 
     try {
-      const result = await uploadNodesJson(payloadNodes, options);
-      const deleted = Number.isFinite(result.deleted) ? result.deleted : 0;
-      const summary = options.replace ? "Node configuration replaced." : "Node update applied.";
-      setMessage(`${summary} Inserted: ${result.inserted}, Updated: ${result.updated}, Deleted: ${deleted}.`);
+      const result = await uploadNodesJson(payloadNodes);
+      setMessage(`Node update applied. Inserted: ${result.inserted}, Updated: ${result.updated}.`);
       await handleRefreshNodes();
       return result;
     } catch (err) {

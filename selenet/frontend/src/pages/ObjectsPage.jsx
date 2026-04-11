@@ -43,10 +43,15 @@ const IMPORT_TEMPLATE = `{
       "orbit": "Lunar Corridor",
       "location_label": "Lagrange Corridor L1",
       "time_offset_seconds": 0,
-      "links": ["SAT_A"],
-      "contact_windows": [
-        { "start": "2026-04-10T07:50:00Z", "end": "2026-04-10T08:20:00Z" },
-        { "start": "2026-04-10T12:00:00Z", "end": "2026-04-10T12:30:00Z" }
+      "links": [
+        {
+          "dest_node": "SAT_A",
+          "bandwidth_bps": 1000000,
+          "windows": [
+            { "start": "2026-04-10T07:50:00Z", "end": "2026-04-10T08:20:00Z" },
+            { "start": "2026-04-10T12:00:00Z", "end": "2026-04-10T12:30:00Z" }
+          ]
+        }
       ]
     }
   ]
@@ -129,6 +134,72 @@ function parseNodeType(value) {
   return "satellite";
 }
 
+function extractLinkDestinations(linkProfiles) {
+  if (!Array.isArray(linkProfiles)) {
+    return [];
+  }
+
+  return uniqueStrings(
+    linkProfiles
+      .map((item) => (typeof item?.dest_node === "string" ? item.dest_node : ""))
+      .filter(Boolean)
+  );
+}
+
+function countNodeWindows(node) {
+  if (!Array.isArray(node?.links)) {
+    return 0;
+  }
+
+  return node.links.reduce((total, link) => {
+    if (!Array.isArray(link?.windows)) {
+      return total;
+    }
+    return total + link.windows.length;
+  }, 0);
+}
+
+function linkProfilesToEditorWindows(linkProfiles) {
+  if (!Array.isArray(linkProfiles)) {
+    return [];
+  }
+
+  const firstWithWindows = linkProfiles.find((link) => Array.isArray(link?.windows) && link.windows.length > 0);
+  if (!firstWithWindows) {
+    return [];
+  }
+
+  return firstWithWindows.windows.map((windowRow) => ({
+    start: isoToLocalDateTimeInput(windowRow?.start),
+    end: isoToLocalDateTimeInput(windowRow?.end),
+  }));
+}
+
+function importedLinkToProfile(rawLink, linkIndex, nodeId) {
+  if (!rawLink || typeof rawLink !== "object") {
+    throw new Error(`Obiekt ${nodeId}: link ${linkIndex + 1} musi byc obiektem.`);
+  }
+
+  const destNode = typeof rawLink.dest_node === "string" ? rawLink.dest_node.trim() : "";
+  if (!destNode) {
+    throw new Error(`Obiekt ${nodeId}: link ${linkIndex + 1} musi miec pole dest_node.`);
+  }
+
+  const windowsRaw = Array.isArray(rawLink.windows) ? rawLink.windows : [];
+  const windows = windowsRaw.map((windowRow, windowIndex) => importedWindowToIso(windowRow, windowIndex, nodeId));
+
+  const bandwidthRaw = Number(rawLink.bandwidth_bps ?? 1000000);
+  if (!Number.isFinite(bandwidthRaw) || bandwidthRaw <= 0) {
+    throw new Error(`Obiekt ${nodeId}: link ${linkIndex + 1} ma niepoprawne bandwidth_bps.`);
+  }
+
+  return {
+    dest_node: destNode,
+    bandwidth_bps: Math.trunc(bandwidthRaw),
+    windows,
+  };
+}
+
 function importedWindowToIso(windowRow, windowIndex, nodeId) {
   const startValue = typeof windowRow?.start === "string" ? windowRow.start : "";
   const endValue = typeof windowRow?.end === "string" ? windowRow.end : "";
@@ -157,8 +228,8 @@ function normalizeImportedNode(rawNode, index) {
     throw new Error(`Obiekt ${nodeId}: pole time_offset_seconds musi byc liczba.`);
   }
 
-  const windowsRaw = Array.isArray(rawNode.contact_windows) ? rawNode.contact_windows : [];
-  const windows = windowsRaw.map((windowRow, windowIndex) => importedWindowToIso(windowRow, windowIndex, nodeId));
+  const linksRaw = Array.isArray(rawNode.links) ? rawNode.links : [];
+  const links = linksRaw.map((linkRow, linkIndex) => importedLinkToProfile(linkRow, linkIndex, nodeId));
 
   return {
     node_id: nodeId,
@@ -169,8 +240,7 @@ function normalizeImportedNode(rawNode, index) {
         ? rawNode.location_label.trim()
         : null,
     time_offset_seconds: Math.trunc(timeOffsetRaw),
-    links: uniqueStrings(Array.isArray(rawNode.links) ? rawNode.links : []),
-    contact_windows: windows,
+    links,
   };
 }
 
@@ -380,18 +450,16 @@ export default function ObjectsPage({ nodes, loadingNodes, onSaveNodes, onRefres
       orbit: editor.orbit.trim() ? editor.orbit.trim() : null,
       location_label: editor.location_label.trim() ? editor.location_label.trim() : null,
       time_offset_seconds: Math.trunc(offsetRaw),
-      links,
-      contact_windows: windows,
+      links: links.map((destNode) => ({
+        dest_node: destNode,
+        bandwidth_bps: 1000000,
+        windows: windows.map((windowRow) => ({ ...windowRow })),
+      })),
     };
   };
 
   const loadNodeToEditor = (node, sourceType) => {
-    const loadedWindows = Array.isArray(node.contact_windows)
-      ? node.contact_windows.map((windowRow) => ({
-          start: isoToLocalDateTimeInput(windowRow?.start),
-          end: isoToLocalDateTimeInput(windowRow?.end),
-        }))
-      : [];
+    const loadedWindows = linkProfilesToEditorWindows(node.links);
 
     setEditor({
       node_id: node.node_id || "",
@@ -399,7 +467,7 @@ export default function ObjectsPage({ nodes, loadingNodes, onSaveNodes, onRefres
       orbit: typeof node.orbit === "string" ? node.orbit : "",
       location_label: typeof node.location_label === "string" ? node.location_label : "",
       time_offset_seconds: String(Number.isFinite(Number(node.time_offset_seconds)) ? node.time_offset_seconds : 0),
-      links: uniqueStrings(Array.isArray(node.links) ? node.links : []),
+      links: extractLinkDestinations(node.links),
       new_link: "",
       windows: loadedWindows.length > 0 ? loadedWindows : [createEmptyWindowRow()],
     });
@@ -508,13 +576,10 @@ export default function ObjectsPage({ nodes, loadingNodes, onSaveNodes, onRefres
     clearFeedback();
 
     try {
-      const result = await onSaveNodes(draftNodes, { replace: true });
+      const result = await onSaveNodes(draftNodes);
       setDraftNodes([]);
       await onRefreshNodes();
-      const deleted = Number.isFinite(result.deleted) ? result.deleted : 0;
-      setLocalMessage(
-        `Szkic zastapil konfiguracje. Dodane: ${result.inserted}, zaktualizowane: ${result.updated}, usuniete: ${deleted}.`
-      );
+      setLocalMessage(`Szkic zapisany. Dodane: ${result.inserted}, zaktualizowane: ${result.updated}.`);
     } catch (error) {
       setLocalError(error.message);
     } finally {
@@ -602,10 +667,12 @@ export default function ObjectsPage({ nodes, loadingNodes, onSaveNodes, onRefres
                           <CTableDataCell className="mono">{node.node_id}</CTableDataCell>
                           <CTableDataCell>{node.node_type}</CTableDataCell>
                           <CTableDataCell className="mono">
-                            {Array.isArray(node.links) && node.links.length > 0 ? node.links.join(", ") : "brak"}
+                            {extractLinkDestinations(node.links).length > 0
+                              ? extractLinkDestinations(node.links).join(", ")
+                              : "brak"}
                           </CTableDataCell>
                           <CTableDataCell className="mono">
-                            {Array.isArray(node.contact_windows) ? node.contact_windows.length : 0}
+                            {countNodeWindows(node)}
                           </CTableDataCell>
                           <CTableDataCell className="text-end">
                             <CButton
@@ -664,9 +731,11 @@ export default function ObjectsPage({ nodes, loadingNodes, onSaveNodes, onRefres
                             <CTableDataCell className="mono">{node.node_id}</CTableDataCell>
                             <CTableDataCell>{node.node_type}</CTableDataCell>
                             <CTableDataCell className="mono">
-                              {node.links.length > 0 ? node.links.join(", ") : "brak"}
+                              {extractLinkDestinations(node.links).length > 0
+                                ? extractLinkDestinations(node.links).join(", ")
+                                : "brak"}
                             </CTableDataCell>
-                            <CTableDataCell className="mono">{node.contact_windows.length || 0}</CTableDataCell>
+                            <CTableDataCell className="mono">{countNodeWindows(node)}</CTableDataCell>
                             <CTableDataCell className="text-end">
                               <CButton
                                 color="info"

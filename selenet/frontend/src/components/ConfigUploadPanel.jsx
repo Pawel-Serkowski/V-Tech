@@ -20,19 +20,24 @@ const TEMPLATE = `[
     "position_y_km": 0.0,
     "position_z_km": 0.0,
     "time_offset_seconds": 0,
-    "links": ["LUNA_RELAY_B"],
-    "contact_windows": [
+    "links": [
       {
-        "start": "2026-04-10T07:50:00Z",
-        "end": "2026-04-10T08:20:00Z"
-      },
-      {
-        "start": "2026-04-10T12:10:00Z",
-        "end": "2026-04-10T12:50:00Z"
-      },
-      {
-        "start": "2026-04-10T18:45:00Z",
-        "end": "2026-04-10T19:30:00Z"
+        "dest_node": "LUNA_RELAY_B",
+        "bandwidth_bps": 1200000,
+        "windows": [
+          {
+            "start": "2026-04-10T07:50:00Z",
+            "end": "2026-04-10T08:20:00Z"
+          },
+          {
+            "start": "2026-04-10T12:10:00Z",
+            "end": "2026-04-10T12:50:00Z"
+          },
+          {
+            "start": "2026-04-10T18:45:00Z",
+            "end": "2026-04-10T19:30:00Z"
+          }
+        ]
       }
     ]
   },
@@ -44,19 +49,24 @@ const TEMPLATE = `[
     "position_y_km": 9000.0,
     "position_z_km": -500.0,
     "time_offset_seconds": 1,
-    "links": ["LUNA_ORBITER_A"],
-    "contact_windows": [
+    "links": [
       {
-        "start": "2026-04-10T07:58:00Z",
-        "end": "2026-04-10T08:42:00Z"
-      },
-      {
-        "start": "2026-04-10T12:18:00Z",
-        "end": "2026-04-10T13:04:00Z"
-      },
-      {
-        "start": "2026-04-10T18:54:00Z",
-        "end": "2026-04-10T19:56:00Z"
+        "dest_node": "LUNA_ORBITER_A",
+        "bandwidth_bps": 900000,
+        "windows": [
+          {
+            "start": "2026-04-10T07:58:00Z",
+            "end": "2026-04-10T08:42:00Z"
+          },
+          {
+            "start": "2026-04-10T12:18:00Z",
+            "end": "2026-04-10T13:04:00Z"
+          },
+          {
+            "start": "2026-04-10T18:54:00Z",
+            "end": "2026-04-10T19:56:00Z"
+          }
+        ]
       }
     ]
   },
@@ -68,21 +78,7 @@ const TEMPLATE = `[
     "position_y_km": 8000.0,
     "position_z_km": 1200.0,
     "time_offset_seconds": 2,
-    "links": [],
-    "contact_windows": [
-      {
-        "start": "2026-04-10T08:00:00Z",
-        "end": "2026-04-10T08:40:00Z"
-      },
-      {
-        "start": "2026-04-10T12:20:00Z",
-        "end": "2026-04-10T13:00:00Z"
-      },
-      {
-        "start": "2026-04-10T18:50:00Z",
-        "end": "2026-04-10T19:50:00Z"
-      }
-    ]
+    "links": []
   }
 ]`;
 

@@ -4,11 +4,12 @@ from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query
 
-from app.cgr import CGREngine
-from app.db import get_database
-from app.models import PacketAck, PacketCreate, PacketStatusUpdate, PacketSummary, QueueLoadItem
-from app.rabbitmq import packet_queue_name_for_node, rabbit_publisher
-from app.websocket_manager import ws_manager
+from ..cgr import CGREngine
+from ..db import get_database
+from ..models import PacketAck, PacketCreate, PacketStatusUpdate, PacketSummary, QueueLoadItem
+from ..rabbitmq import packet_queue_name_for_node, rabbit_publisher
+from ..websocket_manager import ws_manager
+from ..utils2 import flatten_nodes_to_contact_plan, estimate_packet_size
 
 router = APIRouter()
 
@@ -56,23 +57,50 @@ def _build_route_locations(
     return route_locations
 
 
+def _extract_link_destinations(node: dict[str, Any]) -> list[str]:
+    links_raw = node.get("links")
+    if not isinstance(links_raw, list):
+        return []
+
+    unique: set[str] = set()
+    output: list[str] = []
+    for link in links_raw:
+        if not isinstance(link, dict):
+            continue
+        dest = link.get("dest_node")
+        if not isinstance(dest, str):
+            continue
+        cleaned = dest.strip()
+        if not cleaned or cleaned in unique:
+            continue
+        unique.add(cleaned)
+        output.append(cleaned)
+
+    return output
+
+
 @router.post("", response_model=PacketAck, status_code=202)
 async def ingest_packet(packet: PacketCreate) -> PacketAck:
     db = get_database()
-    packet_id = str(uuid.uuid4())
     earth_timestamp = datetime.now(timezone.utc)
+    
+    nodes_raw = await db.nodes.find({}, {"_id": 0}).to_list(length=5000)
+    
+    contact_plan = flatten_nodes_to_contact_plan(nodes_raw)
+    
+    packet_size = estimate_packet_size(packet.payload)
 
-    nodes = await db.nodes.find({}, {"_id": 0}).to_list(length=5000)
     route_hops = CGREngine.compute_route_hops(
         source_node=packet.source_node,
         destination_node=packet.destination_node,
-        nodes=nodes,
+        contact_plan=contact_plan,
         earth_timestamp=earth_timestamp,
+        packet_size_bytes=packet_size, 
         ttl_seconds=packet.ttl_seconds,
         hop_limit=packet.hop_limit,
     )
     next_hop = route_hops[0] if route_hops else None
-    route_locations = _build_route_locations(packet.source_node, route_hops or [], nodes)
+    route_locations = _build_route_locations(packet.source_node, route_hops or [], nodes_raw)
 
     queue_status = "QUEUED_ON_EARTH" if next_hop else "WAITING_RETRY"
 
@@ -89,6 +117,8 @@ async def ingest_packet(packet: PacketCreate) -> PacketAck:
             "next_hop": next_hop,
         },
     ]
+
+    packet_id = str(uuid.uuid4())
 
     packet_doc = {
         "packet_id": packet_id,
@@ -163,6 +193,42 @@ async def list_packets(limit: int = Query(default=100, ge=1, le=1000)) -> list[P
     cursor = db.packets.find({}).sort("earth_timestamp", -1).limit(limit)
     rows = await cursor.to_list(length=limit)
     return [PacketSummary.model_validate(_serialize_packet(row)) for row in rows]
+
+
+@router.get("/dispatch-context")
+async def dispatch_context() -> dict[str, Any]:
+    db = get_database()
+    nodes = await db.nodes.find({}, {"_id": 0, "node_id": 1, "links": 1}).to_list(length=5000)
+
+    node_ids = sorted(
+        {
+            item.get("node_id")
+            for item in nodes
+            if isinstance(item.get("node_id"), str) and item.get("node_id").strip()
+        }
+    )
+
+    if len(node_ids) < 2:
+        return {
+            "allowed_source_nodes": node_ids,
+            "summary": "Zdefiniuj co najmniej 2 wezly, aby uruchomic dispatch.",
+            "configuration_error": "Need at least two nodes in configuration.",
+        }
+
+    nodes_with_links = []
+    for node in nodes:
+        node_id = node.get("node_id")
+        if not isinstance(node_id, str) or not node_id.strip():
+            continue
+        if _extract_link_destinations(node):
+            nodes_with_links.append(node_id)
+
+    allowed = sorted(set(nodes_with_links or node_ids))
+    return {
+        "allowed_source_nodes": allowed,
+        "summary": "Wybierz wezel zrodlowy i docelowy z aktualnej topologii.",
+        "configuration_error": "",
+    }
 
 
 @router.get("/queue-load", response_model=list[QueueLoadItem])
@@ -301,7 +367,7 @@ async def cancel_packet(packet_id: str):
         raise HTTPException(status_code=404, detail="Packet not found.")
 
     current_status = str(packet_row.get("current_status", "")).upper()
-    if current_status in {"DELIVERED", "FAILED", "ERROR"}:
+    if current_status in {"DELIVERED", "FAILED", "FAILED_EXPIRED", "ERROR"}:
         raise HTTPException(
             status_code=409,
             detail=f"Packet is already terminal ({current_status}) and cannot be cancelled.",

@@ -1,0 +1,46 @@
+[
+  {
+    "source": "ESTRACK_AU",
+    "dest": "LUNA_ORBITER_A",
+    "bandwidth_bps": 1000000,
+    "windows": [
+      {
+        "start": "2026-04-10T08:05:00Z",
+        "end": "2026-04-10T08:30:00Z",
+        "avg_range_km": 386005.303
+      },
+      {
+        "start": "2026-04-10T12:15:00Z",
+        "end": "2026-04-10T12:55:00Z",
+        "avg_range_km": 386005.303
+      },
+      {
+        "start": "2026-04-10T19:00:00Z",
+        "end": "2026-04-10T19:40:00Z",
+        "avg_range_km": 386005.303
+      }
+    ]
+  },
+  {
+    "source": "ESTRACK_PL",
+    "dest": "ESTRACK_AU",
+    "bandwidth_bps": 1000000,
+    "windows": [
+      {
+        "start": "2026-04-10T07:50:00Z",
+        "end": "2026-04-10T08:20:00Z",
+        "avg_range_km": 9009.955
+      },
+      {
+        "start": "2026-04-10T12:10:00Z",
+        "end": "2026-04-10T12:50:00Z",
+        "avg_range_km": 9009.955
+      },
+      {
+        "start": "2026-04-10T18:45:00Z",
+        "end": "2026-04-10T19:30:00Z",
+        "avg_range_km": 9009.955
+      }
+    ]
+  }
+]

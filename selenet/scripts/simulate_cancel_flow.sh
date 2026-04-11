@@ -17,7 +17,7 @@ if ! [[ "${POLL_SECONDS}" =~ ^[0-9]+$ ]]; then
 fi
 
 echo "[1/6] Uploading deterministic multi-hop node config..."
-curl -sS -X POST "${API_BASE_URL}/api/nodes?replace=true" \
+curl -sS -X POST "${API_BASE_URL}/api/nodes" \
   -H 'Content-Type: application/json' \
   -d '{
     "nodes": [
@@ -27,9 +27,14 @@ curl -sS -X POST "${API_BASE_URL}/api/nodes?replace=true" \
         "orbit": "Earth Surface",
         "time_offset_seconds": 0,
         "location_label": "Earth Mission Control",
-        "links": ["SAT_1"],
-        "contact_windows": [
-          {"start": "2026-01-01T00:00:00Z", "end": "2027-01-01T00:00:00Z"}
+        "links": [
+          {
+            "dest_node": "SAT_1",
+            "bandwidth_bps": 1000000,
+            "windows": [
+              {"start": "2026-01-01T00:00:00Z", "end": "2027-01-01T00:00:00Z"}
+            ]
+          }
         ]
       },
       {
@@ -38,9 +43,14 @@ curl -sS -X POST "${API_BASE_URL}/api/nodes?replace=true" \
         "orbit": "Relay 1",
         "time_offset_seconds": 0,
         "location_label": "NRHO Plane A",
-        "links": ["SAT_2"],
-        "contact_windows": [
-          {"start": "2026-01-01T00:00:00Z", "end": "2027-01-01T00:00:00Z"}
+        "links": [
+          {
+            "dest_node": "SAT_2",
+            "bandwidth_bps": 1000000,
+            "windows": [
+              {"start": "2026-01-01T00:00:00Z", "end": "2027-01-01T00:00:00Z"}
+            ]
+          }
         ]
       },
       {
@@ -49,9 +59,21 @@ curl -sS -X POST "${API_BASE_URL}/api/nodes?replace=true" \
         "orbit": "Relay 2",
         "time_offset_seconds": 0,
         "location_label": "Lunar Far Side Relay",
-        "links": ["SAT_1", "LUNAR_GATEWAY"],
-        "contact_windows": [
-          {"start": "2026-01-01T00:00:00Z", "end": "2027-01-01T00:00:00Z"}
+        "links": [
+          {
+            "dest_node": "SAT_1",
+            "bandwidth_bps": 1000000,
+            "windows": [
+              {"start": "2026-01-01T00:00:00Z", "end": "2027-01-01T00:00:00Z"}
+            ]
+          },
+          {
+            "dest_node": "LUNAR_GATEWAY",
+            "bandwidth_bps": 1000000,
+            "windows": [
+              {"start": "2026-01-01T00:00:00Z", "end": "2027-01-01T00:00:00Z"}
+            ]
+          }
         ]
       },
       {
@@ -60,10 +82,7 @@ curl -sS -X POST "${API_BASE_URL}/api/nodes?replace=true" \
         "orbit": "Destination",
         "time_offset_seconds": 0,
         "location_label": "Lunar Gateway Hub",
-        "links": [],
-        "contact_windows": [
-          {"start": "2026-01-01T00:00:00Z", "end": "2027-01-01T00:00:00Z"}
-        ]
+        "links": []
       }
     ]
   }' > /tmp/selenet-cancel-step1.json

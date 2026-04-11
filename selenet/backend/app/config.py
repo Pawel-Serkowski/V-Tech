@@ -16,6 +16,8 @@ class Settings(BaseSettings):
     retry_scan_interval_seconds: float = 5.0
     retry_batch_size: int = 200
     cors_origins: str = "*"
+    default_bandwidth_bps: int = 1000000
+    default_range_km: float = 384000.0
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 

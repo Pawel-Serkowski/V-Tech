@@ -66,7 +66,12 @@ def build_graph(nodes: list[dict]):
         node_id = node.get("node_id")
         if not node_id:
             continue
-        links = [item for item in (node.get("links") or []) if isinstance(item, str) and item]
+        links = []
+        for link in node.get("links") or []:
+            if isinstance(link, dict):
+                dest = link.get("dest_node")
+                if isinstance(dest, str) and dest:
+                    links.append(dest)
         graph[node_id] = links
     return graph
 

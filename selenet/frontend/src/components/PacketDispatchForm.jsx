@@ -70,7 +70,7 @@ export default function PacketDispatchForm({
       if ("links" in (node ?? {})) {
         const links = Array.isArray(node?.links)
           ? node.links
-              .filter((item) => typeof item === "string")
+              .map((item) => (typeof item?.dest_node === "string" ? item.dest_node : ""))
               .map((item) => item.trim())
               .filter((item) => item.length > 0 && item !== nodeId && knownIds.has(item))
           : [];

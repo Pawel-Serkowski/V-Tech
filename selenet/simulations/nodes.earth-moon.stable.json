@@ -1,0 +1,70 @@
+{
+  "nodes": [
+    {
+      "node_id": "EARTH_GATEWAY",
+      "node_type": "ground_station",
+      "orbit": "Earth Surface",
+      "location_label": "Earth Mission Control",
+      "time_offset_seconds": 0,
+      "links": [
+        "SAT_1"
+      ],
+      "contact_windows": [
+        {
+          "start": "2026-01-01T00:00:00Z",
+          "end": "2027-01-01T00:00:00Z"
+        }
+      ]
+    },
+    {
+      "node_id": "SAT_1",
+      "node_type": "satellite",
+      "orbit": "Cislunar Transfer Relay",
+      "location_label": "Cislunar Relay A",
+      "time_offset_seconds": 1,
+      "links": [
+        "EARTH_GATEWAY",
+        "SAT_2"
+      ],
+      "contact_windows": [
+        {
+          "start": "2026-01-01T00:00:00Z",
+          "end": "2027-01-01T00:00:00Z"
+        }
+      ]
+    },
+    {
+      "node_id": "SAT_2",
+      "node_type": "satellite",
+      "orbit": "Lunar Relay Orbit",
+      "location_label": "Lunar Far Side Relay",
+      "time_offset_seconds": 2,
+      "links": [
+        "SAT_1",
+        "LUNA_ORBITER_A"
+      ],
+      "contact_windows": [
+        {
+          "start": "2026-01-01T00:00:00Z",
+          "end": "2027-01-01T00:00:00Z"
+        }
+      ]
+    },
+    {
+      "node_id": "LUNA_ORBITER_A",
+      "node_type": "relay",
+      "orbit": "NRHO Lunar Gateway",
+      "location_label": "Lunar Gateway Hub",
+      "time_offset_seconds": 3,
+      "links": [
+        "SAT_2"
+      ],
+      "contact_windows": [
+        {
+          "start": "2026-01-01T00:00:00Z",
+          "end": "2027-01-01T00:00:00Z"
+        }
+      ]
+    }
+  ]
+}
