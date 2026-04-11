@@ -610,7 +610,7 @@ function fallbackDirection(nodeId) {
   ).normalize();
 }
 
-function computeNodePlacement(node, network) {
+function computeNodePlacement(node, network, elapsed = 0) {
   const bodyId = network === "moon" ? "moon" : "earth";
   const worldCenter = BODY_WORLD_CENTER[bodyId];
   const worldRadiusKm = BODY_WORLD_RADIUS_KM[bodyId];
@@ -620,8 +620,8 @@ function computeNodePlacement(node, network) {
   let resolvedY = node.actual_position_y_km;
   let resolvedZ = node.actual_position_z_km;
   
-  if (resolvedX === undefined || resolvedX === null) {
-    const fallback = resolveNodePosition(node, 0);
+  if (isBaseNode(node) || resolvedX === undefined || resolvedX === null) {
+    const fallback = resolveNodePosition(node, elapsed);
     resolvedX = fallback?.x ?? 0;
     resolvedY = fallback?.y ?? 0;
     resolvedZ = fallback?.z ?? 0;
@@ -688,9 +688,9 @@ function buildRouteNodeIds(packet) {
   return routeIds.filter((nodeId, index, all) => index === 0 || nodeId !== all[index - 1]);
 }
 
-function createLiveSatelliteConfig(node, index, activeLoad) {
+function createLiveSatelliteConfig(node, index, activeLoad, elapsed = 0) {
   const network = classifyNetwork(node);
-  const placement = computeNodePlacement(node, network);
+  const placement = computeNodePlacement(node, network, elapsed);
 
   const paletteByType = {
     ground_station: ["#68c8ff", "#b5f2ff"],
@@ -716,6 +716,9 @@ function createLiveSatelliteConfig(node, index, activeLoad) {
     network,
     bodyColor,
     panelColor,
+    radius: placement.radiusScene,
+    orbitColor: "#c8c8c8",
+    orbitOpacity: 0.25,
     staticPlacement: {
       position: placement.positionScene,
       lookAt: new THREE.Vector3(0, 0, 0),
@@ -723,9 +726,9 @@ function createLiveSatelliteConfig(node, index, activeLoad) {
   };
 }
 
-function createLiveBaseConfig(node, activeLoad) {
+function createLiveBaseConfig(node, activeLoad, elapsed = 0) {
   const network = classifyNetwork(node);
-  const placement = computeNodePlacement(node, network);
+  const placement = computeNodePlacement(node, network, elapsed);
   const normal = [placement.normal.x, placement.normal.y, placement.normal.z];
 
   const linkInfo = Array.isArray(node.links) && node.links.length > 0
@@ -776,7 +779,7 @@ function removeLiveNode(nodeId) {
   liveNodeVisuals.delete(nodeId);
 }
 
-function syncLiveNodes() {
+function syncLiveNodes(elapsed = 0) {
   const snapshot = getTelemetrySnapshot();
   const nodes = Array.isArray(snapshot?.nodes) ? snapshot.nodes : [];
   const packets = Array.isArray(snapshot?.packets) ? snapshot.packets : [];
@@ -825,7 +828,7 @@ function syncLiveNodes() {
       const activeLoad = activeLoadByNode.get(node.node_id) ?? 0;
 
       if (isBaseNode(node)) {
-        const baseConfig = createLiveBaseConfig(node, activeLoad);
+        const baseConfig = createLiveBaseConfig(node, activeLoad, elapsed);
         const parent = baseConfig.network === "moon" ? moonSurfaceGroup : earthSurfaceGroup;
         const baseEntry = createBase(parent, baseConfig);
 
@@ -837,13 +840,20 @@ function syncLiveNodes() {
         return;
       }
 
-      const liveConfig = createLiveSatelliteConfig(node, index, activeLoad);
+      const liveConfig = createLiveSatelliteConfig(node, index, activeLoad, elapsed);
       const parent = liveConfig.network === "moon" ? moonGroup : earthGroup;
+      const orbitLine = createOrbitLine(
+        liveConfig.radius,
+        liveConfig.orbitColor,
+        liveConfig.orbitOpacity,
+        parent,
+        1.0
+      );
       const satelliteEntry = createSatellite(parent, liveConfig);
 
       liveNodeVisuals.set(node.node_id, {
         ...satelliteEntry,
-        orbitLine: null,
+        orbitLine,
         kind: "satellite",
         node,
       });
@@ -852,7 +862,7 @@ function syncLiveNodes() {
     liveNodeSignature = signature;
   }
 
-  orderedNodes.forEach((node, index) => {
+    orderedNodes.forEach((node, index) => {
     const visual = liveNodeVisuals.get(node.node_id);
     if (!visual) {
       return;
@@ -861,8 +871,8 @@ function syncLiveNodes() {
     visual.node = node;
     const activeLoad = activeLoadByNode.get(node.node_id) ?? 0;
     const nextData = isBaseNode(node)
-      ? createLiveBaseConfig(node, activeLoad)
-      : createLiveSatelliteConfig(node, index, activeLoad);
+      ? createLiveBaseConfig(node, activeLoad, elapsed)
+      : createLiveSatelliteConfig(node, index, activeLoad, elapsed);
 
     const lookupNode = nodeLookup.get(node.node_id);
     if (lookupNode) {
@@ -1019,8 +1029,8 @@ function samplePolylinePoint(points, t) {
   return points[index].clone().lerp(points[index + 1], localT);
 }
 
-function createDynamicRoute() {
-  syncLiveNodes();
+function createDynamicRoute(elapsed = 0) {
+  syncLiveNodes(elapsed);
 
   const snapshot = getTelemetrySnapshot();
   const nodes = Array.isArray(snapshot?.nodes) ? snapshot.nodes : [];
@@ -1539,10 +1549,56 @@ function animate() {
   moonPivot.rotation.y = 0;
   moonSurfaceGroup.rotation.y = elapsed * 0.12;
 
+  const origin = new THREE.Vector3(0, 0, 0);
+  orbitingBodies.forEach((object) => {
+    const angle = object.angle + elapsed * object.speed;
+    object.mesh.position.set(Math.cos(angle) * object.radiusX, 0, Math.sin(angle) * object.radiusZ);
+    object.mesh.rotation.x = object.tiltX;
+    object.mesh.rotation.z = object.tiltZ;
+    if (object.mesh.position.lengthSq() > 1e-8) {
+      object.mesh.lookAt(origin);
+    }
+  });
 
   liveNodeVisuals.forEach((visual) => {
     if (visual.kind === "satellite" && visual.targetPosition && visual.mesh) {
-       visual.mesh.position.lerp(visual.targetPosition, 0.08);
+        const bodyId = String(visual.node?.body || visual.node?.orbiting_body || "").toLowerCase();
+        const system = (bodyId === "moon" || bodyId === "luna" || bodyId === "selene") ? "moon" : "earth";
+        
+        if (!visual.orbitNormal) {
+          visual.orbitNormal = new THREE.Vector3(0, 1, 0);
+        }
+        
+        if (!visual.lastTargetPos) {
+          visual.lastTargetPos = visual.targetPosition.clone();
+        } else if (visual.lastTargetPos.distanceToSquared(visual.targetPosition) > 1e-5) {
+          const normal = new THREE.Vector3().crossVectors(visual.lastTargetPos, visual.targetPosition);
+          if (normal.lengthSq() > 1e-6) {
+            visual.orbitNormal.copy(normal).normalize();
+            if (visual.orbitLine) {
+              visual.orbitLine.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), visual.orbitNormal);
+            }
+          }
+          visual.lastTargetPos.copy(visual.targetPosition);
+        }
+
+        const dist = visual.mesh.position.distanceTo(visual.targetPosition);
+        if (dist > 1.2) {
+            visual.mesh.position.copy(visual.targetPosition);
+        } else {
+            const radius = visual.mesh.position.length();
+            const speed = getOrbitalAngularSpeed(radius, system, 1);
+            
+            visual.mesh.position.applyAxisAngle(visual.orbitNormal, speed * delta * 0.15);
+            
+            const curLen = visual.mesh.position.length();
+            const targetLen = visual.targetPosition.length();
+            const lerpFactor = Math.min(delta * 0.45, 1.0);
+            
+            visual.mesh.position.lerp(visual.targetPosition, lerpFactor);
+            visual.mesh.position.setLength(THREE.MathUtils.lerp(curLen, targetLen, lerpFactor * 2.0));
+            visual.mesh.lookAt(visual.targetPosition);
+        }
     }
   });
 
@@ -1579,7 +1635,7 @@ function animate() {
   topologyGeometry.setAttribute('position', new THREE.Float32BufferAttribute(topologyPositions, 3));
 
 
-  const route = createDynamicRoute();
+  const route = createDynamicRoute(elapsed);
   relayBeams.forEach((beam, index) => {
     beam.line.visible = false;
     beam.marker.visible = false;
