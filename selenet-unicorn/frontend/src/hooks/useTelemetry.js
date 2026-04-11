@@ -187,9 +187,10 @@ export function useTelemetry() {
       await Promise.all([refreshNodes(), refreshDispatch()]);
 
       const deleted = Number.isFinite(result?.deleted) ? result.deleted : 0;
+      const resetPackets = Number.isFinite(result?.reset_packets) ? result.reset_packets : 0;
       setMessage(
         `${options.replace ? "Konfiguracja floty podmieniona." : "Konfiguracja floty zaktualizowana."} `
-        + `Inserted: ${result.inserted}, Updated: ${result.updated}, Deleted: ${deleted}.`
+        + `Inserted: ${result.inserted}, Updated: ${result.updated}, Deleted: ${deleted}, Reset packets: ${resetPackets}.`
       );
 
       return result;

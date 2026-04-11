@@ -1,9 +1,9 @@
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 
 import yaml
-from fastapi import APIRouter, File, HTTPException, UploadFile
+from fastapi import APIRouter, File, HTTPException, Query, UploadFile
 
 from ..db import get_database
 from ..models import NodeConfig, NodeUploadRequest
@@ -62,10 +62,12 @@ def _normalize_nodes_payload(payload: Any) -> list[NodeConfig]:
     return validated_nodes
 
 
-async def _upsert_nodes(validated_nodes: list[NodeConfig]) -> dict[str, int]:
+async def _upsert_nodes(validated_nodes: list[NodeConfig], replace: bool = False) -> dict[str, int]:
     db = get_database()
     inserted = 0
     updated = 0
+    deleted = 0
+    reset_packets = 0
 
     for node in validated_nodes:
         node_payload = node.model_dump(mode="json")
@@ -80,21 +82,70 @@ async def _upsert_nodes(validated_nodes: list[NodeConfig]) -> dict[str, int]:
         else:
             updated += 1
 
-    return {"inserted": inserted, "updated": updated}
+    if replace:
+        keep_ids = [node.node_id for node in validated_nodes]
+        delete_result = await db.nodes.delete_many({"node_id": {"$nin": keep_ids}})
+        deleted = int(delete_result.deleted_count or 0)
+
+        now = datetime.now(timezone.utc)
+        reset_result = await db.packets.update_many(
+            {
+                "current_status": {
+                    "$in": [
+                        "WAITING_RETRY",
+                        "QUEUED_ON_EARTH",
+                        "IN_TRANSIT",
+                    ]
+                },
+                "cancel_requested": {"$ne": True},
+            },
+            {
+                "$set": {
+                    "current_status": "CANCELLED",
+                    "cancel_requested": True,
+                    "cancel_requested_at": now,
+                    "next_hop": None,
+                    "route_hops": [],
+                    "route_locations": {},
+                    "updated_at": now,
+                },
+                "$push": {
+                    "status_history": {
+                        "status": "CANCELLED",
+                        "at": now,
+                        "detail": "Packet cancelled because fleet topology was replaced.",
+                    }
+                },
+            },
+        )
+        reset_packets = int(reset_result.modified_count or 0)
+
+    return {
+        "inserted": inserted,
+        "updated": updated,
+        "deleted": deleted,
+        "reset_packets": reset_packets,
+    }
 
 
 @router.post("")
-async def upload_nodes(payload: NodeUploadRequest) -> dict[str, Any]:
-    stats = await _upsert_nodes(payload.nodes)
+async def upload_nodes(
+    payload: NodeUploadRequest,
+    replace: bool = Query(default=False),
+) -> dict[str, Any]:
+    stats = await _upsert_nodes(payload.nodes, replace=replace)
     return {
         "status": "ok",
-        "message": "Node configuration accepted.",
+        "message": "Node configuration accepted." if not replace else "Node configuration replaced.",
         **stats,
     }
 
 
 @router.post("/upload-file")
-async def upload_nodes_file(file: UploadFile = File(...)) -> dict[str, Any]:
+async def upload_nodes_file(
+    file: UploadFile = File(...),
+    replace: bool = Query(default=False),
+) -> dict[str, Any]:
     file_content = await file.read()
     filename = (file.filename or "").lower()
 
@@ -118,11 +169,11 @@ async def upload_nodes_file(file: UploadFile = File(...)) -> dict[str, Any]:
         raise HTTPException(status_code=400, detail=f"Unable to parse configuration file: {exc}") from exc
 
     validated_nodes = _normalize_nodes_payload(parsed)
-    stats = await _upsert_nodes(validated_nodes)
+    stats = await _upsert_nodes(validated_nodes, replace=replace)
 
     return {
         "status": "ok",
-        "message": "Node configuration file accepted.",
+        "message": "Node configuration file accepted." if not replace else "Node configuration file replaced fleet.",
         **stats,
     }
 

@@ -52,6 +52,11 @@ class NodeConfig(BaseModel):
     position_x_km: float | None = None
     position_y_km: float | None = None
     position_z_km: float | None = None
+    actual_position_x_km: float | None = None
+    actual_position_y_km: float | None = None
+    actual_position_z_km: float | None = None
+    altitude_km: float | None = None
+    body: str | None = None
     time_offset_seconds: int = 0
     # USUWAMY: contact_windows: list[ContactWindow]
     # ZMIENIAMY links na nową klasę:
