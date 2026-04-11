@@ -62,18 +62,22 @@ export function cancelPacket(packetId) {
   });
 }
 
-export function uploadNodesJson(nodes) {
-  return request("/api/nodes", {
+export function uploadNodesJson(nodes, options = {}) {
+  const query = options.replace ? "?replace=true" : "";
+
+  return request(`/api/nodes${query}`, {
     method: "POST",
     body: JSON.stringify({ nodes }),
   });
 }
 
-export function uploadNodesFile(file) {
+export function uploadNodesFile(file, options = {}) {
   const formData = new FormData();
   formData.append("file", file);
 
-  return request("/api/nodes/upload-file", {
+  const query = options.replace ? "?replace=true" : "";
+
+  return request(`/api/nodes/upload-file${query}`, {
     method: "POST",
     body: formData,
   });
