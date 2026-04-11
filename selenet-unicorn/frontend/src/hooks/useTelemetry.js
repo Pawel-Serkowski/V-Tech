@@ -204,9 +204,12 @@ export function useTelemetry() {
       const result = await uploadNodesFile(file, options);
       await Promise.all([refreshNodes(), refreshDispatch()]);
 
+      const deleted = Number.isFinite(result?.deleted) ? result.deleted : 0;
+      const resetPackets = Number.isFinite(result?.reset_packets) ? result.reset_packets : 0;
+
       setMessage(
         `${options.replace ? "Wgrano plik i podmieniono cala flote." : "Wgrano plik konfiguracyjny floty."} `
-        + `Inserted: ${result.inserted}, Updated: ${result.updated}.`
+        + `Inserted: ${result.inserted}, Updated: ${result.updated}, Deleted: ${deleted}, Reset packets: ${resetPackets}.`
       );
 
       return result;

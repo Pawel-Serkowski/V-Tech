@@ -1,0 +1,1017 @@
+{
+  "nodes": [
+    {
+      "node_id": "EARTH_GATEWAY",
+      "node_type": "ground_station",
+      "body": "earth",
+      "orbit": "Earth Surface",
+      "location_label": "Earth Mission Control",
+      "surface_lat_deg": 0.0,
+      "surface_lon_deg": 0.0,
+      "time_offset_seconds": 0,
+      "links": [
+        {
+          "dest_node": "SAT_1",
+          "bandwidth_bps": 1000000,
+          "windows": [
+            {
+              "start": "2026-01-01T00:00:00Z",
+              "end": "2028-01-01T00:00:00Z"
+            }
+          ]
+        },
+        {
+          "dest_node": "SAT_2",
+          "bandwidth_bps": 1000000,
+          "windows": [
+            {
+              "start": "2026-01-01T00:00:00Z",
+              "end": "2028-01-01T00:00:00Z"
+            }
+          ]
+        },
+        {
+          "dest_node": "SAT_CANCEL_R1",
+          "bandwidth_bps": 1000000,
+          "windows": [
+            {
+              "start": "2026-01-01T00:00:00Z",
+              "end": "2028-01-01T00:00:00Z"
+            }
+          ]
+        },
+        {
+          "dest_node": "SAT_CANCEL_R2",
+          "bandwidth_bps": 1000000,
+          "windows": [
+            {
+              "start": "2026-01-01T00:00:00Z",
+              "end": "2028-01-01T00:00:00Z"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "node_id": "ESTRACK_PL",
+      "node_type": "ground_station",
+      "body": "earth",
+      "orbit": "Earth Surface",
+      "location_label": "ESTRACK Poland",
+      "surface_lat_deg": 52.2297,
+      "surface_lon_deg": 21.0122,
+      "time_offset_seconds": 1,
+      "links": [
+        {
+          "dest_node": "SAT_1",
+          "bandwidth_bps": 1000000,
+          "windows": [
+            {
+              "start": "2026-01-01T00:00:00Z",
+              "end": "2028-01-01T00:00:00Z"
+            }
+          ]
+        },
+        {
+          "dest_node": "SAT_2",
+          "bandwidth_bps": 1000000,
+          "windows": [
+            {
+              "start": "2026-01-01T00:00:00Z",
+              "end": "2028-01-01T00:00:00Z"
+            }
+          ]
+        },
+        {
+          "dest_node": "LUNAR_GATEWAY",
+          "bandwidth_bps": 1000000,
+          "windows": [
+            {
+              "start": "2026-01-01T00:00:00Z",
+              "end": "2028-01-01T00:00:00Z"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "node_id": "GS_CANCEL_TEST",
+      "node_type": "ground_station",
+      "body": "earth",
+      "orbit": "Earth Surface",
+      "location_label": "Cancel Test Ground",
+      "surface_lat_deg": 34.742,
+      "surface_lon_deg": -120.572,
+      "time_offset_seconds": 2,
+      "links": [
+        {
+          "dest_node": "SAT_CANCEL_R1",
+          "bandwidth_bps": 1000000,
+          "windows": [
+            {
+              "start": "2026-01-01T00:00:00Z",
+              "end": "2028-01-01T00:00:00Z"
+            }
+          ]
+        },
+        {
+          "dest_node": "SAT_CANCEL_R2",
+          "bandwidth_bps": 1000000,
+          "windows": [
+            {
+              "start": "2026-01-01T00:00:00Z",
+              "end": "2028-01-01T00:00:00Z"
+            }
+          ]
+        },
+        {
+          "dest_node": "SAT_CANCEL_DST",
+          "bandwidth_bps": 1000000,
+          "windows": [
+            {
+              "start": "2026-01-01T00:00:00Z",
+              "end": "2028-01-01T00:00:00Z"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "node_id": "GS_TEST",
+      "node_type": "ground_station",
+      "body": "earth",
+      "orbit": "Earth Surface",
+      "location_label": "Main Test Ground",
+      "surface_lat_deg": 35.2,
+      "surface_lon_deg": -116.8,
+      "time_offset_seconds": 3,
+      "links": [
+        {
+          "dest_node": "SAT_1",
+          "bandwidth_bps": 1000000,
+          "windows": [
+            {
+              "start": "2026-01-01T00:00:00Z",
+              "end": "2028-01-01T00:00:00Z"
+            }
+          ]
+        },
+        {
+          "dest_node": "SAT_2",
+          "bandwidth_bps": 1000000,
+          "windows": [
+            {
+              "start": "2026-01-01T00:00:00Z",
+              "end": "2028-01-01T00:00:00Z"
+            }
+          ]
+        },
+        {
+          "dest_node": "SAT_DST",
+          "bandwidth_bps": 1000000,
+          "windows": [
+            {
+              "start": "2026-01-01T00:00:00Z",
+              "end": "2028-01-01T00:00:00Z"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "node_id": "NO_WORKER_SRC",
+      "node_type": "ground_station",
+      "body": "earth",
+      "orbit": "Earth Surface",
+      "location_label": "No Worker Source",
+      "surface_lat_deg": -23.7,
+      "surface_lon_deg": 133.9,
+      "time_offset_seconds": 4,
+      "links": [
+        {
+          "dest_node": "SAT_2",
+          "bandwidth_bps": 1000000,
+          "windows": [
+            {
+              "start": "2026-01-01T00:00:00Z",
+              "end": "2028-01-01T00:00:00Z"
+            }
+          ]
+        },
+        {
+          "dest_node": "SAT_R1",
+          "bandwidth_bps": 1000000,
+          "windows": [
+            {
+              "start": "2026-01-01T00:00:00Z",
+              "end": "2028-01-01T00:00:00Z"
+            }
+          ]
+        },
+        {
+          "dest_node": "LUNAR_GATEWAY",
+          "bandwidth_bps": 1000000,
+          "windows": [
+            {
+              "start": "2026-01-01T00:00:00Z",
+              "end": "2028-01-01T00:00:00Z"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "node_id": "SAT_1",
+      "node_type": "satellite",
+      "body": "earth",
+      "orbiting_body": "earth",
+      "orbit_altitude_km": 680,
+      "orbital_inclination_deg": 28,
+      "orbital_phase_deg": 5,
+      "location_label": "LEO Relay A",
+      "time_offset_seconds": 5,
+      "links": [
+        {
+          "dest_node": "EARTH_GATEWAY",
+          "bandwidth_bps": 1000000,
+          "windows": [
+            {
+              "start": "2026-01-01T00:00:00Z",
+              "end": "2028-01-01T00:00:00Z"
+            }
+          ]
+        },
+        {
+          "dest_node": "ESTRACK_PL",
+          "bandwidth_bps": 1000000,
+          "windows": [
+            {
+              "start": "2026-01-01T00:00:00Z",
+              "end": "2028-01-01T00:00:00Z"
+            }
+          ]
+        },
+        {
+          "dest_node": "GS_TEST",
+          "bandwidth_bps": 1000000,
+          "windows": [
+            {
+              "start": "2026-01-01T00:00:00Z",
+              "end": "2028-01-01T00:00:00Z"
+            }
+          ]
+        },
+        {
+          "dest_node": "SAT_2",
+          "bandwidth_bps": 1000000,
+          "windows": [
+            {
+              "start": "2026-01-01T00:00:00Z",
+              "end": "2028-01-01T00:00:00Z"
+            }
+          ]
+        },
+        {
+          "dest_node": "SAT_R2",
+          "bandwidth_bps": 1000000,
+          "windows": [
+            {
+              "start": "2026-01-01T00:00:00Z",
+              "end": "2028-01-01T00:00:00Z"
+            }
+          ]
+        },
+        {
+          "dest_node": "LUNAR_GATEWAY",
+          "bandwidth_bps": 1000000,
+          "windows": [
+            {
+              "start": "2026-01-01T00:00:00Z",
+              "end": "2028-01-01T00:00:00Z"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "node_id": "SAT_2",
+      "node_type": "satellite",
+      "body": "earth",
+      "orbiting_body": "earth",
+      "orbit_altitude_km": 6800,
+      "orbital_inclination_deg": 55,
+      "orbital_phase_deg": 40,
+      "location_label": "MEO Relay B",
+      "time_offset_seconds": 6,
+      "links": [
+        {
+          "dest_node": "EARTH_GATEWAY",
+          "bandwidth_bps": 1000000,
+          "windows": [
+            {
+              "start": "2026-01-01T00:00:00Z",
+              "end": "2028-01-01T00:00:00Z"
+            }
+          ]
+        },
+        {
+          "dest_node": "ESTRACK_PL",
+          "bandwidth_bps": 1000000,
+          "windows": [
+            {
+              "start": "2026-01-01T00:00:00Z",
+              "end": "2028-01-01T00:00:00Z"
+            }
+          ]
+        },
+        {
+          "dest_node": "NO_WORKER_SRC",
+          "bandwidth_bps": 1000000,
+          "windows": [
+            {
+              "start": "2026-01-01T00:00:00Z",
+              "end": "2028-01-01T00:00:00Z"
+            }
+          ]
+        },
+        {
+          "dest_node": "SAT_1",
+          "bandwidth_bps": 1000000,
+          "windows": [
+            {
+              "start": "2026-01-01T00:00:00Z",
+              "end": "2028-01-01T00:00:00Z"
+            }
+          ]
+        },
+        {
+          "dest_node": "SAT_R1",
+          "bandwidth_bps": 1000000,
+          "windows": [
+            {
+              "start": "2026-01-01T00:00:00Z",
+              "end": "2028-01-01T00:00:00Z"
+            }
+          ]
+        },
+        {
+          "dest_node": "LUNAR_GATEWAY",
+          "bandwidth_bps": 1000000,
+          "windows": [
+            {
+              "start": "2026-01-01T00:00:00Z",
+              "end": "2028-01-01T00:00:00Z"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "node_id": "SAT_CANCEL_R1",
+      "node_type": "satellite",
+      "body": "earth",
+      "orbiting_body": "earth",
+      "orbit_altitude_km": 980,
+      "orbital_inclination_deg": 70,
+      "orbital_phase_deg": 120,
+      "location_label": "Cancel Relay 1",
+      "time_offset_seconds": 7,
+      "links": [
+        {
+          "dest_node": "EARTH_GATEWAY",
+          "bandwidth_bps": 1000000,
+          "windows": [
+            {
+              "start": "2026-01-01T00:00:00Z",
+              "end": "2028-01-01T00:00:00Z"
+            }
+          ]
+        },
+        {
+          "dest_node": "GS_CANCEL_TEST",
+          "bandwidth_bps": 1000000,
+          "windows": [
+            {
+              "start": "2026-01-01T00:00:00Z",
+              "end": "2028-01-01T00:00:00Z"
+            }
+          ]
+        },
+        {
+          "dest_node": "SAT_CANCEL_R2",
+          "bandwidth_bps": 1000000,
+          "windows": [
+            {
+              "start": "2026-01-01T00:00:00Z",
+              "end": "2028-01-01T00:00:00Z"
+            }
+          ]
+        },
+        {
+          "dest_node": "SAT_CANCEL_DST",
+          "bandwidth_bps": 1000000,
+          "windows": [
+            {
+              "start": "2026-01-01T00:00:00Z",
+              "end": "2028-01-01T00:00:00Z"
+            }
+          ]
+        },
+        {
+          "dest_node": "SAT_R1",
+          "bandwidth_bps": 1000000,
+          "windows": [
+            {
+              "start": "2026-01-01T00:00:00Z",
+              "end": "2028-01-01T00:00:00Z"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "node_id": "SAT_CANCEL_R2",
+      "node_type": "satellite",
+      "body": "earth",
+      "orbiting_body": "earth",
+      "orbit_altitude_km": 1140,
+      "orbital_inclination_deg": 70,
+      "orbital_phase_deg": 300,
+      "location_label": "Cancel Relay 2",
+      "time_offset_seconds": 8,
+      "links": [
+        {
+          "dest_node": "EARTH_GATEWAY",
+          "bandwidth_bps": 1000000,
+          "windows": [
+            {
+              "start": "2026-01-01T00:00:00Z",
+              "end": "2028-01-01T00:00:00Z"
+            }
+          ]
+        },
+        {
+          "dest_node": "GS_CANCEL_TEST",
+          "bandwidth_bps": 1000000,
+          "windows": [
+            {
+              "start": "2026-01-01T00:00:00Z",
+              "end": "2028-01-01T00:00:00Z"
+            }
+          ]
+        },
+        {
+          "dest_node": "SAT_CANCEL_R1",
+          "bandwidth_bps": 1000000,
+          "windows": [
+            {
+              "start": "2026-01-01T00:00:00Z",
+              "end": "2028-01-01T00:00:00Z"
+            }
+          ]
+        },
+        {
+          "dest_node": "SAT_CANCEL_DST",
+          "bandwidth_bps": 1000000,
+          "windows": [
+            {
+              "start": "2026-01-01T00:00:00Z",
+              "end": "2028-01-01T00:00:00Z"
+            }
+          ]
+        },
+        {
+          "dest_node": "SAT_R2",
+          "bandwidth_bps": 1000000,
+          "windows": [
+            {
+              "start": "2026-01-01T00:00:00Z",
+              "end": "2028-01-01T00:00:00Z"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "node_id": "SAT_CANCEL_DST",
+      "node_type": "satellite",
+      "body": "earth",
+      "orbiting_body": "earth",
+      "orbit_altitude_km": 2280,
+      "orbital_inclination_deg": 10,
+      "orbital_phase_deg": 210,
+      "location_label": "Cancel Destination",
+      "time_offset_seconds": 9,
+      "links": [
+        {
+          "dest_node": "GS_CANCEL_TEST",
+          "bandwidth_bps": 1000000,
+          "windows": [
+            {
+              "start": "2026-01-01T00:00:00Z",
+              "end": "2028-01-01T00:00:00Z"
+            }
+          ]
+        },
+        {
+          "dest_node": "SAT_CANCEL_R1",
+          "bandwidth_bps": 1000000,
+          "windows": [
+            {
+              "start": "2026-01-01T00:00:00Z",
+              "end": "2028-01-01T00:00:00Z"
+            }
+          ]
+        },
+        {
+          "dest_node": "SAT_CANCEL_R2",
+          "bandwidth_bps": 1000000,
+          "windows": [
+            {
+              "start": "2026-01-01T00:00:00Z",
+              "end": "2028-01-01T00:00:00Z"
+            }
+          ]
+        },
+        {
+          "dest_node": "LUNAR_GATEWAY",
+          "bandwidth_bps": 1000000,
+          "windows": [
+            {
+              "start": "2026-01-01T00:00:00Z",
+              "end": "2028-01-01T00:00:00Z"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "node_id": "SAT_DST",
+      "node_type": "satellite",
+      "body": "earth",
+      "orbiting_body": "earth",
+      "orbit_altitude_km": 2720,
+      "orbital_inclination_deg": 35,
+      "orbital_phase_deg": 160,
+      "location_label": "Primary Destination",
+      "time_offset_seconds": 10,
+      "links": [
+        {
+          "dest_node": "GS_TEST",
+          "bandwidth_bps": 1000000,
+          "windows": [
+            {
+              "start": "2026-01-01T00:00:00Z",
+              "end": "2028-01-01T00:00:00Z"
+            }
+          ]
+        },
+        {
+          "dest_node": "SAT_1",
+          "bandwidth_bps": 1000000,
+          "windows": [
+            {
+              "start": "2026-01-01T00:00:00Z",
+              "end": "2028-01-01T00:00:00Z"
+            }
+          ]
+        },
+        {
+          "dest_node": "SAT_2",
+          "bandwidth_bps": 1000000,
+          "windows": [
+            {
+              "start": "2026-01-01T00:00:00Z",
+              "end": "2028-01-01T00:00:00Z"
+            }
+          ]
+        },
+        {
+          "dest_node": "SAT_R1",
+          "bandwidth_bps": 1000000,
+          "windows": [
+            {
+              "start": "2026-01-01T00:00:00Z",
+              "end": "2028-01-01T00:00:00Z"
+            }
+          ]
+        },
+        {
+          "dest_node": "SAT_R2",
+          "bandwidth_bps": 1000000,
+          "windows": [
+            {
+              "start": "2026-01-01T00:00:00Z",
+              "end": "2028-01-01T00:00:00Z"
+            }
+          ]
+        },
+        {
+          "dest_node": "LUNAR_GATEWAY",
+          "bandwidth_bps": 1000000,
+          "windows": [
+            {
+              "start": "2026-01-01T00:00:00Z",
+              "end": "2028-01-01T00:00:00Z"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "node_id": "LUNAR_GATEWAY",
+      "node_type": "relay",
+      "body": "moon",
+      "orbiting_body": "moon",
+      "orbit_altitude_km": 3360,
+      "orbital_inclination_deg": 12,
+      "orbital_phase_deg": 0,
+      "location_label": "Lunar Gateway",
+      "time_offset_seconds": 11,
+      "links": [
+        {
+          "dest_node": "SAT_1",
+          "bandwidth_bps": 1000000,
+          "windows": [
+            {
+              "start": "2026-01-01T00:00:00Z",
+              "end": "2028-01-01T00:00:00Z"
+            }
+          ]
+        },
+        {
+          "dest_node": "SAT_2",
+          "bandwidth_bps": 1000000,
+          "windows": [
+            {
+              "start": "2026-01-01T00:00:00Z",
+              "end": "2028-01-01T00:00:00Z"
+            }
+          ]
+        },
+        {
+          "dest_node": "SAT_DST",
+          "bandwidth_bps": 1000000,
+          "windows": [
+            {
+              "start": "2026-01-01T00:00:00Z",
+              "end": "2028-01-01T00:00:00Z"
+            }
+          ]
+        },
+        {
+          "dest_node": "SAT_CANCEL_DST",
+          "bandwidth_bps": 1000000,
+          "windows": [
+            {
+              "start": "2026-01-01T00:00:00Z",
+              "end": "2028-01-01T00:00:00Z"
+            }
+          ]
+        },
+        {
+          "dest_node": "LUNA_ORBITER_A",
+          "bandwidth_bps": 1000000,
+          "windows": [
+            {
+              "start": "2026-01-01T00:00:00Z",
+              "end": "2028-01-01T00:00:00Z"
+            }
+          ]
+        },
+        {
+          "dest_node": "LUNA_RELAY_B",
+          "bandwidth_bps": 1000000,
+          "windows": [
+            {
+              "start": "2026-01-01T00:00:00Z",
+              "end": "2028-01-01T00:00:00Z"
+            }
+          ]
+        },
+        {
+          "dest_node": "SAT_R1",
+          "bandwidth_bps": 1000000,
+          "windows": [
+            {
+              "start": "2026-01-01T00:00:00Z",
+              "end": "2028-01-01T00:00:00Z"
+            }
+          ]
+        },
+        {
+          "dest_node": "SAT_R2",
+          "bandwidth_bps": 1000000,
+          "windows": [
+            {
+              "start": "2026-01-01T00:00:00Z",
+              "end": "2028-01-01T00:00:00Z"
+            }
+          ]
+        },
+        {
+          "dest_node": "ESTRACK_PL",
+          "bandwidth_bps": 1000000,
+          "windows": [
+            {
+              "start": "2026-01-01T00:00:00Z",
+              "end": "2028-01-01T00:00:00Z"
+            }
+          ]
+        },
+        {
+          "dest_node": "NO_WORKER_SRC",
+          "bandwidth_bps": 1000000,
+          "windows": [
+            {
+              "start": "2026-01-01T00:00:00Z",
+              "end": "2028-01-01T00:00:00Z"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "node_id": "LUNA_ORBITER_A",
+      "node_type": "satellite",
+      "body": "moon",
+      "orbiting_body": "moon",
+      "orbit_altitude_km": 1460,
+      "orbital_inclination_deg": 55,
+      "orbital_phase_deg": 45,
+      "location_label": "Luna Orbiter A",
+      "time_offset_seconds": 12,
+      "links": [
+        {
+          "dest_node": "LUNAR_GATEWAY",
+          "bandwidth_bps": 1000000,
+          "windows": [
+            {
+              "start": "2026-01-01T00:00:00Z",
+              "end": "2028-01-01T00:00:00Z"
+            }
+          ]
+        },
+        {
+          "dest_node": "LUNA_RELAY_B",
+          "bandwidth_bps": 1000000,
+          "windows": [
+            {
+              "start": "2026-01-01T00:00:00Z",
+              "end": "2028-01-01T00:00:00Z"
+            }
+          ]
+        },
+        {
+          "dest_node": "SAT_R1",
+          "bandwidth_bps": 1000000,
+          "windows": [
+            {
+              "start": "2026-01-01T00:00:00Z",
+              "end": "2028-01-01T00:00:00Z"
+            }
+          ]
+        },
+        {
+          "dest_node": "SAT_R2",
+          "bandwidth_bps": 1000000,
+          "windows": [
+            {
+              "start": "2026-01-01T00:00:00Z",
+              "end": "2028-01-01T00:00:00Z"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "node_id": "LUNA_RELAY_B",
+      "node_type": "relay",
+      "body": "moon",
+      "orbiting_body": "moon",
+      "orbit_altitude_km": 2680,
+      "orbital_inclination_deg": 35,
+      "orbital_phase_deg": 180,
+      "location_label": "Luna Relay B",
+      "time_offset_seconds": 13,
+      "links": [
+        {
+          "dest_node": "LUNAR_GATEWAY",
+          "bandwidth_bps": 1000000,
+          "windows": [
+            {
+              "start": "2026-01-01T00:00:00Z",
+              "end": "2028-01-01T00:00:00Z"
+            }
+          ]
+        },
+        {
+          "dest_node": "LUNA_ORBITER_A",
+          "bandwidth_bps": 1000000,
+          "windows": [
+            {
+              "start": "2026-01-01T00:00:00Z",
+              "end": "2028-01-01T00:00:00Z"
+            }
+          ]
+        },
+        {
+          "dest_node": "SAT_R1",
+          "bandwidth_bps": 1000000,
+          "windows": [
+            {
+              "start": "2026-01-01T00:00:00Z",
+              "end": "2028-01-01T00:00:00Z"
+            }
+          ]
+        },
+        {
+          "dest_node": "SAT_R2",
+          "bandwidth_bps": 1000000,
+          "windows": [
+            {
+              "start": "2026-01-01T00:00:00Z",
+              "end": "2028-01-01T00:00:00Z"
+            }
+          ]
+        },
+        {
+          "dest_node": "SAT_DST",
+          "bandwidth_bps": 1000000,
+          "windows": [
+            {
+              "start": "2026-01-01T00:00:00Z",
+              "end": "2028-01-01T00:00:00Z"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "node_id": "SAT_R1",
+      "node_type": "satellite",
+      "body": "moon",
+      "orbiting_body": "moon",
+      "orbit_altitude_km": 920,
+      "orbital_inclination_deg": 85,
+      "orbital_phase_deg": 90,
+      "location_label": "Lunar Relay Sat R1",
+      "time_offset_seconds": 14,
+      "links": [
+        {
+          "dest_node": "SAT_2",
+          "bandwidth_bps": 1000000,
+          "windows": [
+            {
+              "start": "2026-01-01T00:00:00Z",
+              "end": "2028-01-01T00:00:00Z"
+            }
+          ]
+        },
+        {
+          "dest_node": "SAT_CANCEL_R1",
+          "bandwidth_bps": 1000000,
+          "windows": [
+            {
+              "start": "2026-01-01T00:00:00Z",
+              "end": "2028-01-01T00:00:00Z"
+            }
+          ]
+        },
+        {
+          "dest_node": "SAT_DST",
+          "bandwidth_bps": 1000000,
+          "windows": [
+            {
+              "start": "2026-01-01T00:00:00Z",
+              "end": "2028-01-01T00:00:00Z"
+            }
+          ]
+        },
+        {
+          "dest_node": "LUNAR_GATEWAY",
+          "bandwidth_bps": 1000000,
+          "windows": [
+            {
+              "start": "2026-01-01T00:00:00Z",
+              "end": "2028-01-01T00:00:00Z"
+            }
+          ]
+        },
+        {
+          "dest_node": "LUNA_ORBITER_A",
+          "bandwidth_bps": 1000000,
+          "windows": [
+            {
+              "start": "2026-01-01T00:00:00Z",
+              "end": "2028-01-01T00:00:00Z"
+            }
+          ]
+        },
+        {
+          "dest_node": "LUNA_RELAY_B",
+          "bandwidth_bps": 1000000,
+          "windows": [
+            {
+              "start": "2026-01-01T00:00:00Z",
+              "end": "2028-01-01T00:00:00Z"
+            }
+          ]
+        },
+        {
+          "dest_node": "SAT_R2",
+          "bandwidth_bps": 1000000,
+          "windows": [
+            {
+              "start": "2026-01-01T00:00:00Z",
+              "end": "2028-01-01T00:00:00Z"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "node_id": "SAT_R2",
+      "node_type": "satellite",
+      "body": "moon",
+      "orbiting_body": "moon",
+      "orbit_altitude_km": 1760,
+      "orbital_inclination_deg": 85,
+      "orbital_phase_deg": 270,
+      "location_label": "Lunar Relay Sat R2",
+      "time_offset_seconds": 15,
+      "links": [
+        {
+          "dest_node": "SAT_1",
+          "bandwidth_bps": 1000000,
+          "windows": [
+            {
+              "start": "2026-01-01T00:00:00Z",
+              "end": "2028-01-01T00:00:00Z"
+            }
+          ]
+        },
+        {
+          "dest_node": "SAT_CANCEL_R2",
+          "bandwidth_bps": 1000000,
+          "windows": [
+            {
+              "start": "2026-01-01T00:00:00Z",
+              "end": "2028-01-01T00:00:00Z"
+            }
+          ]
+        },
+        {
+          "dest_node": "SAT_DST",
+          "bandwidth_bps": 1000000,
+          "windows": [
+            {
+              "start": "2026-01-01T00:00:00Z",
+              "end": "2028-01-01T00:00:00Z"
+            }
+          ]
+        },
+        {
+          "dest_node": "LUNAR_GATEWAY",
+          "bandwidth_bps": 1000000,
+          "windows": [
+            {
+              "start": "2026-01-01T00:00:00Z",
+              "end": "2028-01-01T00:00:00Z"
+            }
+          ]
+        },
+        {
+          "dest_node": "LUNA_ORBITER_A",
+          "bandwidth_bps": 1000000,
+          "windows": [
+            {
+              "start": "2026-01-01T00:00:00Z",
+              "end": "2028-01-01T00:00:00Z"
+            }
+          ]
+        },
+        {
+          "dest_node": "LUNA_RELAY_B",
+          "bandwidth_bps": 1000000,
+          "windows": [
+            {
+              "start": "2026-01-01T00:00:00Z",
+              "end": "2028-01-01T00:00:00Z"
+            }
+          ]
+        },
+        {
+          "dest_node": "SAT_R1",
+          "bandwidth_bps": 1000000,
+          "windows": [
+            {
+              "start": "2026-01-01T00:00:00Z",
+              "end": "2028-01-01T00:00:00Z"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

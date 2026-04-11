@@ -588,6 +588,14 @@ function hashNumber(input, seed = 0) {
   return hash;
 }
 
+function readOptionalNumber(value) {
+  if (value === null || value === undefined || value === "") {
+    return null;
+  }
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
 function classifyNetwork(node) {
   const explicitBody = String(node?.body ?? node?.orbiting_body ?? "").toLowerCase();
   if (explicitBody === "moon") {
@@ -666,19 +674,20 @@ function computeNodePlacement(node, network, elapsed = 0) {
   const worldRadiusKm = BODY_WORLD_RADIUS_KM[bodyId];
   const sceneSurfaceRadius = BODY_SCENE_SURFACE_RADIUS[bodyId];
   const baseNode = isBaseNode(node);
-  const hasModeledOrbit = Number.isFinite(Number(node.orbit_altitude_km));
+  const modeledOrbitAltitudeKm = readOptionalNumber(node.orbit_altitude_km);
+  const hasModeledOrbit = modeledOrbitAltitudeKm !== null;
 
-  let resolvedX = Number(node.actual_position_x_km);
-  let resolvedY = Number(node.actual_position_y_km);
-  let resolvedZ = Number(node.actual_position_z_km);
+  let resolvedX = readOptionalNumber(node.actual_position_x_km);
+  let resolvedY = readOptionalNumber(node.actual_position_y_km);
+  let resolvedZ = readOptionalNumber(node.actual_position_z_km);
 
-  if (!Number.isFinite(resolvedX) || !Number.isFinite(resolvedY) || !Number.isFinite(resolvedZ)) {
-    resolvedX = Number(node.position_x_km);
-    resolvedY = Number(node.position_y_km);
-    resolvedZ = Number(node.position_z_km);
+  if (resolvedX === null || resolvedY === null || resolvedZ === null) {
+    resolvedX = readOptionalNumber(node.position_x_km);
+    resolvedY = readOptionalNumber(node.position_y_km);
+    resolvedZ = readOptionalNumber(node.position_z_km);
   }
   
-  if (baseNode || !Number.isFinite(resolvedX) || !Number.isFinite(resolvedY) || !Number.isFinite(resolvedZ)) {
+  if (baseNode || resolvedX === null || resolvedY === null || resolvedZ === null) {
     const fallback = resolveNodePosition(node, elapsed);
     resolvedX = fallback?.x ?? 0;
     resolvedY = fallback?.y ?? 0;
@@ -698,12 +707,11 @@ function computeNodePlacement(node, network, elapsed = 0) {
   const rawRadiusKm = Number.isFinite(localMagnitude) && localMagnitude > 1e-8
     ? Math.max(worldRadiusKm, localMagnitude)
     : worldRadiusKm;
-  const explicitAltitudeKm = Number(node.altitude_km);
-  const orbitAltitudeKm = Number(node.orbit_altitude_km);
-  const altitudeKm = Number.isFinite(explicitAltitudeKm)
+  const explicitAltitudeKm = readOptionalNumber(node.altitude_km);
+  const altitudeKm = explicitAltitudeKm !== null
     ? explicitAltitudeKm
-    : Number.isFinite(orbitAltitudeKm)
-      ? orbitAltitudeKm
+    : modeledOrbitAltitudeKm !== null
+      ? modeledOrbitAltitudeKm
       : Math.max(0, rawRadiusKm - worldRadiusKm);
   const kmToScene = sceneSurfaceRadius / worldRadiusKm;
   const altitudeScale = bodyId === "moon" ? 1.9 : 1.6;

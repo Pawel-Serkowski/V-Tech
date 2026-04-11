@@ -48,7 +48,13 @@ class NodeConfig(BaseModel):
     node_id: str = Field(min_length=1)
     node_type: Literal["ground_station", "satellite", "relay"] = "satellite"
     orbit: str | None = None
+    orbiting_body: str | None = None
+    orbit_altitude_km: float | None = None
+    orbital_inclination_deg: float = 0
+    orbital_phase_deg: float = 0
     location_label: str | None = None
+    surface_lat_deg: float | None = None
+    surface_lon_deg: float | None = None
     position_x_km: float | None = None
     position_y_km: float | None = None
     position_z_km: float | None = None

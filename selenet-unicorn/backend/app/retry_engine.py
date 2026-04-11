@@ -205,6 +205,7 @@ class PacketRetryEngine:
                 packet_size_bytes=packet_size_bytes,
                 ttl_seconds=remaining_ttl_seconds,
                 hop_limit=packet.get("hop_limit", 10),
+                nodes=nodes,
             )
             next_hop = route_hops[0] if route_hops else None
             route_locations = _build_route_locations(packet["source_node"], route_hops or [], nodes)

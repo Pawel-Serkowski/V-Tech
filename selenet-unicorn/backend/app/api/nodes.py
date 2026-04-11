@@ -4,11 +4,24 @@ from typing import Any
 
 import yaml
 from fastapi import APIRouter, File, HTTPException, Query, UploadFile
+from pydantic import ValidationError
 
 from ..db import get_database
 from ..models import NodeConfig, NodeUploadRequest
 
 router = APIRouter()
+
+
+NODE_TYPE_ALIASES: dict[str, str] = {
+    "ground": "ground_station",
+    "groundstation": "ground_station",
+    "ground_station": "ground_station",
+    "base": "ground_station",
+    "gateway": "ground_station",
+    "sat": "satellite",
+    "satellite": "satellite",
+    "relay": "relay",
+}
 
 
 def _serialize_node(node: dict[str, Any]) -> dict[str, Any]:
@@ -45,6 +58,75 @@ def _serialize_node(node: dict[str, Any]) -> dict[str, Any]:
     node.pop("contact_windows", None)
     return node
 
+
+def _coerce_node_payload(raw_node: Any) -> dict[str, Any]:
+    if not isinstance(raw_node, dict):
+        raise ValueError("Each node entry must be an object.")
+
+    node = dict(raw_node)
+    raw_type = str(node.get("node_type") or "satellite").strip().lower()
+    node["node_type"] = NODE_TYPE_ALIASES.get(raw_type, raw_type)
+
+    shared_windows = node.get("contact_windows") if isinstance(node.get("contact_windows"), list) else []
+    raw_links = node.get("links")
+    normalized_links: list[dict[str, Any]] = []
+
+    if isinstance(raw_links, str):
+        raw_links = [item.strip() for item in raw_links.split(",") if item.strip()]
+
+    if raw_links is None:
+        raw_links = []
+
+    if isinstance(raw_links, list):
+        for link in raw_links:
+            if isinstance(link, str):
+                dest = link.strip()
+                if not dest:
+                    continue
+                normalized_links.append(
+                    {
+                        "dest_node": dest,
+                        "bandwidth_bps": 1000000,
+                        "windows": shared_windows,
+                    }
+                )
+                continue
+
+            if not isinstance(link, dict):
+                continue
+
+            dest_node = str(
+                link.get("dest_node")
+                or link.get("destination")
+                or link.get("target")
+                or ""
+            ).strip()
+            bandwidth = link.get("bandwidth_bps", link.get("bandwidth", 1000000))
+            windows = link.get("windows")
+            if not isinstance(windows, list):
+                windows = shared_windows
+
+            normalized_links.append(
+                {
+                    "dest_node": dest_node,
+                    "bandwidth_bps": bandwidth,
+                    "windows": windows,
+                }
+            )
+
+    node["links"] = normalized_links
+    return node
+
+
+def _format_validation_error(index: int, exc: ValidationError) -> str:
+    first_error = exc.errors(include_url=False)[0] if exc.errors() else None
+    if not first_error:
+        return f"Node at index {index} is invalid."
+
+    location = ".".join(str(part) for part in first_error.get("loc", [])) or "node"
+    message = first_error.get("msg") or "invalid value"
+    return f"Node at index {index} has invalid field '{location}': {message}."
+
 def _normalize_nodes_payload(payload: Any) -> list[NodeConfig]:
     if isinstance(payload, dict) and "nodes" in payload:
         raw_nodes = payload["nodes"]
@@ -57,8 +139,14 @@ def _normalize_nodes_payload(payload: Any) -> list[NodeConfig]:
         raise HTTPException(status_code=400, detail="Node payload must be a non-empty list.")
 
     validated_nodes: list[NodeConfig] = []
-    for item in raw_nodes:
-        validated_nodes.append(NodeConfig.model_validate(item))
+    for index, item in enumerate(raw_nodes):
+        try:
+            coerced = _coerce_node_payload(item)
+            validated_nodes.append(NodeConfig.model_validate(coerced))
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=f"Node at index {index}: {exc}") from exc
+        except ValidationError as exc:
+            raise HTTPException(status_code=422, detail=_format_validation_error(index, exc)) from exc
     return validated_nodes
 
 

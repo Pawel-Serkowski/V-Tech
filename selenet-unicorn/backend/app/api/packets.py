@@ -98,6 +98,7 @@ async def ingest_packet(packet: PacketCreate) -> PacketAck:
         packet_size_bytes=packet_size, 
         ttl_seconds=packet.ttl_seconds,
         hop_limit=packet.hop_limit,
+        nodes=nodes_raw,
     )
     next_hop = route_hops[0] if route_hops else None
     route_locations = _build_route_locations(packet.source_node, route_hops or [], nodes_raw)
