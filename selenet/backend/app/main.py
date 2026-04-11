@@ -3,12 +3,13 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import nodes, packets
-from app.config import get_settings
-from app.db import close_mongo_connection, connect_to_mongo, get_database
-from app.rabbitmq import rabbit_publisher
-from app.retry_engine import packet_retry_engine
-from app.websocket_manager import ws_manager
+from .api import nodes, packets
+from .config import get_settings
+from .db import close_mongo_connection, connect_to_mongo, get_database
+from .default_nodes import seed_default_nodes_if_empty
+from .rabbitmq import rabbit_publisher
+from .retry_engine import packet_retry_engine
+from .websocket_manager import ws_manager
 
 
 async def _reconcile_cancelled_packets_on_startup() -> int:
@@ -37,6 +38,9 @@ async def _reconcile_cancelled_packets_on_startup() -> int:
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     await connect_to_mongo()
+    seeded_count = await seed_default_nodes_if_empty()
+    if seeded_count:
+        print(f"[startup] seeded {seeded_count} default node(s)")
     updated_count = await _reconcile_cancelled_packets_on_startup()
     if updated_count:
         print(f"[startup] reconciled {updated_count} cancelled packet(s) stuck in active statuses")

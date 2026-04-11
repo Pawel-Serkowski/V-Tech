@@ -5,7 +5,7 @@ from typing import Any
 import aio_pika
 from aio_pika.abc import AbstractRobustChannel, AbstractRobustConnection
 
-from app.config import get_settings
+from .config import get_settings
 
 
 def _sanitize_node_id(node_id: str | None) -> str:

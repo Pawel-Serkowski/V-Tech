@@ -5,27 +5,45 @@ from typing import Any
 import yaml
 from fastapi import APIRouter, File, HTTPException, UploadFile
 
-from app.db import get_database
-from app.models import NodeConfig, NodeUploadRequest
+from ..db import get_database
+from ..models import NodeConfig, NodeUploadRequest
 
 router = APIRouter()
 
 
 def _serialize_node(node: dict[str, Any]) -> dict[str, Any]:
     node.pop("_id", None)
-    windows: list[dict[str, Any]] = []
-    for window in node.get("contact_windows", []):
-        start = window.get("start")
-        end = window.get("end")
-        windows.append(
-            {
-                "start": start.isoformat() if isinstance(start, datetime) else start,
-                "end": end.isoformat() if isinstance(end, datetime) else end,
-            }
-        )
-    node["contact_windows"] = windows
-    return node
+    shared_windows = node.get("contact_windows") if isinstance(node.get("contact_windows"), list) else []
+    serialized_links = []
+    for link in node.get("links", []):
+        if isinstance(link, str):
+            serialized_links.append(
+                {
+                    "dest_node": link,
+                    "bandwidth_bps": 1000000,
+                    "windows": shared_windows,
+                }
+            )
+            continue
+        if not isinstance(link, dict):
+            continue
 
+        windows = []
+        for window in link.get("windows", []):
+            if not isinstance(window, dict):
+                continue
+            windows.append({
+                "start": window["start"].isoformat() if isinstance(window["start"], datetime) else window["start"],
+                "end": window["end"].isoformat() if isinstance(window["end"], datetime) else window["end"]
+            })
+        serialized_links.append({
+            "dest_node": link.get("dest_node"),
+            "bandwidth_bps": link.get("bandwidth_bps", 1000000),
+            "windows": windows
+        })
+    node["links"] = serialized_links
+    node.pop("contact_windows", None)
+    return node
 
 def _normalize_nodes_payload(payload: Any) -> list[NodeConfig]:
     if isinstance(payload, dict) and "nodes" in payload:

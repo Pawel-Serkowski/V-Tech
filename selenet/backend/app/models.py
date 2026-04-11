@@ -39,6 +39,10 @@ class ContactWindow(BaseModel):
             raise ValueError("Contact window start must be before end.")
         return self
 
+class LinkProfile(BaseModel):
+    dest_node: str = Field(min_length=1)
+    bandwidth_bps: int = Field(default=1000000, gt=0) # Domyślnie 1 Mbps
+    windows: list[ContactWindow] = Field(default_factory=list)
 
 class NodeConfig(BaseModel):
     node_id: str = Field(min_length=1)
@@ -49,20 +53,22 @@ class NodeConfig(BaseModel):
     position_y_km: float | None = None
     position_z_km: float | None = None
     time_offset_seconds: int = 0
-    contact_windows: list[ContactWindow] = Field(default_factory=list)
-    links: list[str] = Field(default_factory=list)
+    # USUWAMY: contact_windows: list[ContactWindow]
+    # ZMIENIAMY links na nową klasę:
+    links: list[LinkProfile] = Field(default_factory=list)
 
     @model_validator(mode="after")
     def validate_links(self) -> "NodeConfig":
-        cleaned_links: list[str] = []
+        cleaned_links: list[LinkProfile] = []
         seen: set[str] = set()
 
-        for item in self.links:
-            node_id = item.strip()
-            if not node_id or node_id == self.node_id or node_id in seen:
+        for link in self.links:
+            dest_id = link.dest_node.strip()
+            if not dest_id or dest_id == self.node_id or dest_id in seen:
                 continue
-            seen.add(node_id)
-            cleaned_links.append(node_id)
+            seen.add(dest_id)
+            link.dest_node = dest_id
+            cleaned_links.append(link)
 
         self.links = cleaned_links
 

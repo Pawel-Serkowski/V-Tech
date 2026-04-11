@@ -585,6 +585,16 @@ function buildRouteNodeIds(packet) {
   return routeIds.filter((nodeId, index, all) => index === 0 || nodeId !== all[index - 1]);
 }
 
+function extractLinkDestinations(node) {
+  if (!Array.isArray(node?.links)) {
+    return [];
+  }
+
+  return node.links
+    .map((link) => (typeof link?.dest_node === "string" ? link.dest_node.trim() : ""))
+    .filter((dest) => dest.length > 0);
+}
+
 function createLiveSatelliteConfig(node, index, activeLoad) {
   const key = node.node_id;
   const network = classifyNetwork(node);
@@ -610,8 +620,9 @@ function createLiveSatelliteConfig(node, index, activeLoad) {
   const [bodyColor, panelColor] =
     paletteByType[node.node_type] || paletteByType.satellite;
 
-  const linkInfo = Array.isArray(node.links) && node.links.length > 0
-    ? `Polaczenia: ${node.links.join(", ")}`
+  const linkDestinations = extractLinkDestinations(node);
+  const linkInfo = linkDestinations.length > 0
+    ? `Polaczenia: ${linkDestinations.join(", ")}`
     : "Brak aktywnych linkow.";
 
   return {
@@ -650,8 +661,9 @@ function createLiveBaseConfig(node, activeLoad) {
     Math.cos(latitude) * Math.sin(longitude),
   ];
 
-  const linkInfo = Array.isArray(node.links) && node.links.length > 0
-    ? `Polaczenia: ${node.links.join(", ")}`
+  const linkDestinations = extractLinkDestinations(node);
+  const linkInfo = linkDestinations.length > 0
+    ? `Polaczenia: ${linkDestinations.join(", ")}`
     : "Brak aktywnych linkow.";
 
   const isMoon = network === "moon";
