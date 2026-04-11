@@ -5,7 +5,7 @@ from typing import Any
 import aio_pika
 from aio_pika.abc import AbstractRobustChannel, AbstractRobustConnection
 
-from app.config import get_settings
+from .config import get_settings
 
 
 def _sanitize_node_id(node_id: str | None) -> str:
@@ -13,10 +13,12 @@ def _sanitize_node_id(node_id: str | None) -> str:
     if not raw_value:
         return get_settings().default_node_id
 
+    # Keep queue-safe characters and normalize separators.
     sanitized = "".join(
         char if char.isalnum() or char in {"_", "-", "."} else "_"
         for char in raw_value
     )
+
     return sanitized or get_settings().default_node_id
 
 
@@ -39,6 +41,7 @@ class RabbitPublisher:
             return
 
         last_error: Exception | None = None
+
         for attempt in range(1, retries + 1):
             try:
                 self.connection = await aio_pika.connect_robust(settings.rabbitmq_url)
@@ -46,13 +49,15 @@ class RabbitPublisher:
                 await self.channel.set_qos(prefetch_count=20)
                 self._declared_queues = set()
 
+                await self._ensure_packet_queue(settings.packet_queue_name)
+
                 await self.channel.declare_exchange(
                     settings.status_exchange_name,
                     aio_pika.ExchangeType.FANOUT,
                     durable=True,
                 )
                 return
-            except Exception as exc:
+            except Exception as exc:  # pragma: no cover - startup resilience
                 last_error = exc
                 if attempt == retries:
                     break
@@ -79,7 +84,7 @@ class RabbitPublisher:
         self,
         packet_envelope: dict[str, Any],
         rabbit_priority: int,
-        queue_name: str,
+        queue_name: str | None = None,
     ) -> None:
         if self.channel is None or self.channel.is_closed:
             await self.connect()
@@ -87,7 +92,8 @@ class RabbitPublisher:
         if self.channel is None:
             raise RuntimeError("RabbitMQ channel is not initialized.")
 
-        await self._ensure_packet_queue(queue_name)
+        target_queue = queue_name or get_settings().packet_queue_name
+        await self._ensure_packet_queue(target_queue)
 
         message = aio_pika.Message(
             body=json.dumps(packet_envelope, default=str).encode("utf-8"),
@@ -96,7 +102,10 @@ class RabbitPublisher:
             priority=rabbit_priority,
         )
 
-        await self.channel.default_exchange.publish(message, routing_key=queue_name)
+        await self.channel.default_exchange.publish(
+            message,
+            routing_key=target_queue,
+        )
 
     async def close(self) -> None:
         if self.connection and not self.connection.is_closed:

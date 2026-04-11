@@ -3,18 +3,51 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import nodes, packets
-from app.config import get_settings
-from app.db import close_mongo_connection, connect_to_mongo
-from app.rabbitmq import rabbit_publisher
-from app.websocket_manager import ws_manager
+from .api import nodes, packets
+from .config import get_settings
+from .db import close_mongo_connection, connect_to_mongo, get_database
+from .default_nodes import seed_default_nodes_if_empty
+from .rabbitmq import rabbit_publisher
+from .retry_engine import packet_retry_engine
+from .websocket_manager import ws_manager
+
+
+async def _reconcile_cancelled_packets_on_startup() -> int:
+    db = get_database()
+
+    result = await db.packets.update_many(
+        {
+            "cancel_requested": True,
+            "current_status": {
+                "$in": [
+                    "QUEUED_ON_EARTH",
+                    "WAITING_RETRY",
+                    "IN_TRANSIT",
+                ]
+            },
+        },
+        {
+            "$set": {
+                "current_status": "CANCELLED",
+            },
+        },
+    )
+    return result.modified_count
 
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     await connect_to_mongo()
+    seeded_count = await seed_default_nodes_if_empty()
+    if seeded_count:
+        print(f"[startup] seeded {seeded_count} default node(s)")
+    updated_count = await _reconcile_cancelled_packets_on_startup()
+    if updated_count:
+        print(f"[startup] reconciled {updated_count} cancelled packet(s) stuck in active statuses")
     await rabbit_publisher.connect()
+    packet_retry_engine.start()
     yield
+    await packet_retry_engine.stop()
     await rabbit_publisher.close()
     await close_mongo_connection()
 
@@ -23,7 +56,7 @@ settings = get_settings()
 
 app = FastAPI(
     title=settings.app_name,
-    version="0.2.0",
+    version="0.1.0",
     lifespan=lifespan,
 )
 

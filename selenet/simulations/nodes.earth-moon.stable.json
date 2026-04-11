@@ -7,12 +7,15 @@
       "location_label": "Earth Mission Control",
       "time_offset_seconds": 0,
       "links": [
-        "SAT_1"
-      ],
-      "contact_windows": [
         {
-          "start": "2026-01-01T00:00:00Z",
-          "end": "2027-01-01T00:00:00Z"
+          "dest_node": "SAT_1",
+          "bandwidth_bps": 1000000,
+          "windows": [
+            {
+              "start": "2026-01-01T00:00:00Z",
+              "end": "2027-01-01T00:00:00Z"
+            }
+          ]
         }
       ]
     },
@@ -23,13 +26,25 @@
       "location_label": "Cislunar Relay A",
       "time_offset_seconds": 1,
       "links": [
-        "EARTH_GATEWAY",
-        "SAT_2"
-      ],
-      "contact_windows": [
         {
-          "start": "2026-01-01T00:00:00Z",
-          "end": "2027-01-01T00:00:00Z"
+          "dest_node": "EARTH_GATEWAY",
+          "bandwidth_bps": 1000000,
+          "windows": [
+            {
+              "start": "2026-01-01T00:00:00Z",
+              "end": "2027-01-01T00:00:00Z"
+            }
+          ]
+        },
+        {
+          "dest_node": "SAT_2",
+          "bandwidth_bps": 1000000,
+          "windows": [
+            {
+              "start": "2026-01-01T00:00:00Z",
+              "end": "2027-01-01T00:00:00Z"
+            }
+          ]
         }
       ]
     },
@@ -40,13 +55,25 @@
       "location_label": "Lunar Far Side Relay",
       "time_offset_seconds": 2,
       "links": [
-        "SAT_1",
-        "LUNA_ORBITER_A"
-      ],
-      "contact_windows": [
         {
-          "start": "2026-01-01T00:00:00Z",
-          "end": "2027-01-01T00:00:00Z"
+          "dest_node": "SAT_1",
+          "bandwidth_bps": 1000000,
+          "windows": [
+            {
+              "start": "2026-01-01T00:00:00Z",
+              "end": "2027-01-01T00:00:00Z"
+            }
+          ]
+        },
+        {
+          "dest_node": "LUNA_ORBITER_A",
+          "bandwidth_bps": 1000000,
+          "windows": [
+            {
+              "start": "2026-01-01T00:00:00Z",
+              "end": "2027-01-01T00:00:00Z"
+            }
+          ]
         }
       ]
     },
@@ -57,12 +84,15 @@
       "location_label": "Lunar Gateway Hub",
       "time_offset_seconds": 3,
       "links": [
-        "SAT_2"
-      ],
-      "contact_windows": [
         {
-          "start": "2026-01-01T00:00:00Z",
-          "end": "2027-01-01T00:00:00Z"
+          "dest_node": "SAT_2",
+          "bandwidth_bps": 1000000,
+          "windows": [
+            {
+              "start": "2026-01-01T00:00:00Z",
+              "end": "2027-01-01T00:00:00Z"
+            }
+          ]
         }
       ]
     }

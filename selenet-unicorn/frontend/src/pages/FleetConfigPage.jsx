@@ -48,8 +48,12 @@ function sanitizeNodeInput(editor) {
     surface_lat_deg: toNumberOrNull(editor.surface_lat_deg),
     surface_lon_deg: toNumberOrNull(editor.surface_lon_deg),
     location_label: String(editor.location_label || "").trim() || null,
-      link_bandwidth_bps: toNumberOrNull(editor.link_bandwidth_bps) ?? 1048576,
-    };
+    links: String(editor.links || "").split(",").map(s => s.trim()).filter(Boolean).map(dest => ({
+      dest_node: dest,
+      bandwidth_bps: toNumberOrNull(editor.link_bandwidth_bps) ?? 1048576,
+      windows: []
+    })),
+  };
   if (node.surface_lat_deg !== null && node.surface_lon_deg === null) {
     throw new Error("surface_lat_deg i surface_lon_deg musza byc podane razem.");
   }
@@ -69,8 +73,9 @@ function toEditor(node) {
     surface_lat_deg: node.surface_lat_deg ?? "",
     surface_lon_deg: node.surface_lon_deg ?? "",
     location_label: node.location_label || "",
-      link_bandwidth_bps: node.link_bandwidth_bps ?? "1048576",
-    };
+    links: Array.isArray(node.links) ? node.links.map(l => typeof l === "object" ? l.dest_node : l).join(", ") : "",
+    link_bandwidth_bps: (Array.isArray(node.links) && node.links[0]?.bandwidth_bps) ? node.links[0].bandwidth_bps : "1048576",
+  };
   }
 
 function inferOrbitalBody(node) {
@@ -400,7 +405,7 @@ export default function FleetConfigPage({ nodes, loadingNodes, onSaveNodes, onUp
                       <td>{node.location_label || node.orbit || node.body || node.orbiting_body || "-"}</td>
                       <td>{Number.isFinite(Number(node.orbit_altitude_km)) ? Number(node.orbit_altitude_km).toFixed(0) : "-"}</td>
                       <td>{typeof speed === "number" ? speed.toFixed(2) : "-"}</td>
-                      <td>{Array.isArray(node.links) ? node.links.join(", ") : "-"}</td>
+                      <td>{Array.isArray(node.links) ? node.links.map(l => typeof l === "object" ? l.dest_node : l).join(", ") : "-"}</td>
                       <td>
                         <button className="btn tiny ghost" type="button" onClick={() => openEditModal(node)}>
                           Edytuj

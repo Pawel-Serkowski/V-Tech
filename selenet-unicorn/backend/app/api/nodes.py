@@ -3,55 +3,47 @@ from datetime import datetime
 from typing import Any
 
 import yaml
-from fastapi import APIRouter, File, HTTPException, Query, UploadFile
+from fastapi import APIRouter, File, HTTPException, UploadFile
 
-from app.db import get_database
-from app.models import NodeConfig, NodeUploadRequest
+from ..db import get_database
+from ..models import NodeConfig, NodeUploadRequest
 
 router = APIRouter()
 
 
-import math
-from app.cgr import resolve_node_position
-from app.config import get_settings
-
 def _serialize_node(node: dict[str, Any]) -> dict[str, Any]:
     node.pop("_id", None)
-    windows: list[dict[str, Any]] = []
-    for window in node.get("contact_windows", []):
-        start = window.get("start")
-        end = window.get("end")
-        windows.append(
-            {
-                "start": start.isoformat() if isinstance(start, datetime) else start,
-                "end": end.isoformat() if isinstance(end, datetime) else end,
-            }
-        )
-    node["contact_windows"] = windows
+    shared_windows = node.get("contact_windows") if isinstance(node.get("contact_windows"), list) else []
+    serialized_links = []
+    for link in node.get("links", []):
+        if isinstance(link, str):
+            serialized_links.append(
+                {
+                    "dest_node": link,
+                    "bandwidth_bps": 1000000,
+                    "windows": shared_windows,
+                }
+            )
+            continue
+        if not isinstance(link, dict):
+            continue
 
-    # Calculate and inject actual position and altitude
-    pos = resolve_node_position(node)
-    if pos is not None:
-        node["actual_position_x_km"] = pos.x
-        node["actual_position_y_km"] = pos.y
-        node["actual_position_z_km"] = pos.z
-
-        body_name = node.get("body") or node.get("orbiting_body")
-        settings = get_settings()
-        if body_name and isinstance(body_name, str):
-            body = settings.planetary_bodies.get(body_name.lower())
-            if body:
-                center = body["center"]
-                radius = body["radius_km"]
-                dist = math.dist((pos.x, pos.y, pos.z), center)
-                node["altitude_km"] = max(0.0, dist - radius)
-        elif node.get("orbit_altitude_km") is not None:
-            node["altitude_km"] = node["orbit_altitude_km"]
-        else:
-            node["altitude_km"] = 0.0
-
+        windows = []
+        for window in link.get("windows", []):
+            if not isinstance(window, dict):
+                continue
+            windows.append({
+                "start": window["start"].isoformat() if isinstance(window["start"], datetime) else window["start"],
+                "end": window["end"].isoformat() if isinstance(window["end"], datetime) else window["end"]
+            })
+        serialized_links.append({
+            "dest_node": link.get("dest_node"),
+            "bandwidth_bps": link.get("bandwidth_bps", 1000000),
+            "windows": windows
+        })
+    node["links"] = serialized_links
+    node.pop("contact_windows", None)
     return node
-
 
 def _normalize_nodes_payload(payload: Any) -> list[NodeConfig]:
     if isinstance(payload, dict) and "nodes" in payload:
@@ -64,7 +56,10 @@ def _normalize_nodes_payload(payload: Any) -> list[NodeConfig]:
     if not isinstance(raw_nodes, list) or not raw_nodes:
         raise HTTPException(status_code=400, detail="Node payload must be a non-empty list.")
 
-    return [NodeConfig.model_validate(item) for item in raw_nodes]
+    validated_nodes: list[NodeConfig] = []
+    for item in raw_nodes:
+        validated_nodes.append(NodeConfig.model_validate(item))
+    return validated_nodes
 
 
 async def _upsert_nodes(validated_nodes: list[NodeConfig]) -> dict[str, int]:
@@ -89,27 +84,17 @@ async def _upsert_nodes(validated_nodes: list[NodeConfig]) -> dict[str, int]:
 
 
 @router.post("")
-async def upload_nodes(payload: NodeUploadRequest, replace: bool = Query(default=False)) -> dict[str, Any]:
-    db = get_database()
-
-    if replace:
-        payload_node_ids = [node.node_id for node in payload.nodes]
-        await db.nodes.delete_many({"node_id": {"$nin": payload_node_ids}})
-
+async def upload_nodes(payload: NodeUploadRequest) -> dict[str, Any]:
     stats = await _upsert_nodes(payload.nodes)
     return {
         "status": "ok",
         "message": "Node configuration accepted.",
-        "replace": replace,
         **stats,
     }
 
 
 @router.post("/upload-file")
-async def upload_nodes_file(
-    file: UploadFile = File(...),
-    replace: bool = Query(default=False),
-) -> dict[str, Any]:
+async def upload_nodes_file(file: UploadFile = File(...)) -> dict[str, Any]:
     file_content = await file.read()
     filename = (file.filename or "").lower()
 
@@ -124,6 +109,7 @@ async def upload_nodes_file(
         elif filename.endswith(".json"):
             parsed = json.loads(text_content)
         else:
+            # Auto-detect fallback for unknown extension.
             try:
                 parsed = json.loads(text_content)
             except json.JSONDecodeError:
@@ -132,24 +118,17 @@ async def upload_nodes_file(
         raise HTTPException(status_code=400, detail=f"Unable to parse configuration file: {exc}") from exc
 
     validated_nodes = _normalize_nodes_payload(parsed)
-
-    db = get_database()
-    if replace:
-        payload_node_ids = [node.node_id for node in validated_nodes]
-        await db.nodes.delete_many({"node_id": {"$nin": payload_node_ids}})
-
     stats = await _upsert_nodes(validated_nodes)
 
     return {
         "status": "ok",
         "message": "Node configuration file accepted.",
-        "replace": replace,
         **stats,
     }
 
 
 @router.get("")
-async def list_nodes(limit: int = 500) -> list[dict[str, Any]]:
+async def list_nodes(limit: int = 200) -> list[dict[str, Any]]:
     db = get_database()
     cursor = db.nodes.find({}).sort("node_id", 1).limit(limit)
     nodes = await cursor.to_list(length=limit)
