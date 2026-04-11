@@ -16,6 +16,7 @@ MAX_LOCAL_REROUTE_ATTEMPTS = 3
 
 RABBITMQ_URL = os.getenv("RABBITMQ_URL", "amqp://guest:guest@rabbitmq:5672/")
 PACKET_QUEUE_PREFIX = os.getenv("PACKET_QUEUE_PREFIX", "packets")
+PACKET_QUEUE_NAME = os.getenv("PACKET_QUEUE_NAME", "packets.priority").strip()
 NODE_ID = os.getenv("NODE_ID", "EARTH_GATEWAY").strip() or "EARTH_GATEWAY"
 NODE_LOCATION = os.getenv("NODE_LOCATION", "").strip()
 RABBITMQ_MAX_PRIORITY = int(os.getenv("RABBITMQ_MAX_PRIORITY", "10"))
@@ -55,6 +56,8 @@ def _sanitize_node_id(node_id: str | None) -> str:
 
 
 def _queue_for_node(node_id: str | None) -> str:
+    if PACKET_QUEUE_NAME:
+        return PACKET_QUEUE_NAME
     prefix = PACKET_QUEUE_PREFIX.strip() or "packets"
     return f"{prefix}.{_sanitize_node_id(node_id)}"
 

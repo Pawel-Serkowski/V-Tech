@@ -24,6 +24,9 @@ def _sanitize_node_id(node_id: str | None) -> str:
 
 def packet_queue_name_for_node(node_id: str | None) -> str:
     settings = get_settings()
+    shared_queue_name = settings.packet_queue_name.strip()
+    if shared_queue_name:
+        return shared_queue_name
     prefix = settings.packet_queue_prefix.strip() or "packets"
     return f"{prefix}.{_sanitize_node_id(node_id)}"
 
