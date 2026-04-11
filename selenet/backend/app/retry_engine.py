@@ -56,6 +56,14 @@ def _build_route_locations(
     return route_locations
 
 
+def _as_utc(value: Any) -> datetime | None:
+    if not isinstance(value, datetime):
+        return None
+    if value.tzinfo is None or value.tzinfo.utcoffset(value) is None:
+        return value.replace(tzinfo=timezone.utc)
+    return value.astimezone(timezone.utc)
+
+
 class PacketRetryEngine:
     def __init__(self) -> None:
         self._task: asyncio.Task[None] | None = None
@@ -116,15 +124,54 @@ class PacketRetryEngine:
                 "priority": 1,
                 "payload": 1,
                 "earth_timestamp": 1,
+                "ttl_seconds": 1,
+                "hop_limit": 1,
+                "expire_at": 1,
             },
         ).sort("earth_timestamp", 1).limit(settings.retry_batch_size).to_list(length=settings.retry_batch_size)
 
         for packet in waiting_packets:
+            expire_at = _as_utc(packet.get("expire_at"))
+            if isinstance(expire_at, datetime) and now > expire_at:
+                detail = "Packet expired before a valid contact window opened."
+                await db.packets.update_one(
+                    {"packet_id": packet["packet_id"], "current_status": "WAITING_RETRY"},
+                    {
+                        "$set": {
+                            "current_status": "FAILED_EXPIRED",
+                            "updated_at": now,
+                        },
+                        "$push": {
+                            "status_history": {
+                                "status": "FAILED_EXPIRED",
+                                "at": now,
+                                "detail": detail,
+                            }
+                        },
+                    },
+                )
+                await ws_manager.broadcast(
+                    {
+                        "kind": "packet-status",
+                        "packet_id": packet["packet_id"],
+                        "status": "FAILED_EXPIRED",
+                        "detail": detail,
+                        "at": now.isoformat(),
+                    }
+                )
+                continue
+
+            remaining_ttl_seconds = packet.get("ttl_seconds", 3600)
+            if isinstance(expire_at, datetime):
+                remaining_ttl_seconds = max(1, int((expire_at - now).total_seconds()))
+
             route_hops = CGREngine.compute_route_hops(
                 source_node=packet["source_node"],
                 destination_node=packet["destination_node"],
                 nodes=nodes,
                 earth_timestamp=now,
+                ttl_seconds=remaining_ttl_seconds,
+                hop_limit=packet.get("hop_limit", 10),
             )
             next_hop = route_hops[0] if route_hops else None
             route_locations = _build_route_locations(packet["source_node"], route_hops or [], nodes)
@@ -174,6 +221,9 @@ class PacketRetryEngine:
                 "route_hops": route_hops,
                 "route_locations": route_locations,
                 "earth_timestamp": str(packet["earth_timestamp"]),
+                "ttl_seconds": int(remaining_ttl_seconds),
+                "hop_limit": int(packet.get("hop_limit", 10)),
+                "expire_at": expire_at.isoformat() if isinstance(expire_at, datetime) else None,
                 "priority": int(packet.get("priority", PacketPriority.BULK)),
                 "payload": packet.get("payload", {}),
             }
