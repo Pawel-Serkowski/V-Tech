@@ -169,6 +169,9 @@ export default function VisualizationPage({ packets = [], nodes = [] }) {
               <div className="card-hint" data-satellite-hint>
                 Aktywne: brak
               </div>
+              <div className="card-meta" data-simulation-time>
+                Czas symulacji (okna, UTC): --
+              </div>
             </aside>
 
             <aside className="mqtt-card">

@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import argparse
+import hashlib
 import json
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
@@ -75,7 +76,9 @@ def _generate_windows(
     duration = timedelta(minutes=cfg.window_duration_minutes)
 
     # Deterministic phase offset keeps windows reproducible per directed link.
-    offset_minutes = abs(hash(f"{source_id}->{dest_id}")) % max(1, cfg.window_period_minutes)
+    digest = hashlib.sha256(f"{source_id}->{dest_id}".encode("utf-8")).digest()
+    offset_seed = int.from_bytes(digest[:8], byteorder="big", signed=False)
+    offset_minutes = offset_seed % max(1, cfg.window_period_minutes)
     current_start = start_at + timedelta(minutes=offset_minutes)
 
     windows: list[dict[str, str]] = []
@@ -135,6 +138,81 @@ def _merge_windows(windows: list[dict[str, str]]) -> list[dict[str, str]]:
     return [{"start": _to_iso_z(s), "end": _to_iso_z(e)} for s, e in merged]
 
 
+def _is_satellite_like(node: dict[str, Any]) -> bool:
+    node_type = str(node.get("node_type") or "").strip().lower()
+    return node_type in {"satellite", "relay"}
+
+
+def _windows_to_ranges(windows: list[dict[str, Any]]) -> list[tuple[datetime, datetime]]:
+    ranges: list[tuple[datetime, datetime]] = []
+    for item in windows:
+        if not isinstance(item, dict):
+            continue
+        start_raw = item.get("start")
+        end_raw = item.get("end")
+        if not isinstance(start_raw, str) or not isinstance(end_raw, str):
+            continue
+        try:
+            start_dt = _parse_iso_utc(start_raw)
+            end_dt = _parse_iso_utc(end_raw)
+        except Exception:
+            continue
+        if end_dt <= start_dt:
+            continue
+        ranges.append((start_dt, end_dt))
+
+    ranges.sort(key=lambda item: item[0])
+    if not ranges:
+        return []
+
+    merged: list[tuple[datetime, datetime]] = [ranges[0]]
+    for start_dt, end_dt in ranges[1:]:
+        last_start, last_end = merged[-1]
+        if start_dt <= last_end:
+            merged[-1] = (last_start, max(last_end, end_dt))
+        else:
+            merged.append((start_dt, end_dt))
+    return merged
+
+
+def _intersect_ranges(
+    left: list[tuple[datetime, datetime]],
+    right: list[tuple[datetime, datetime]],
+) -> list[tuple[datetime, datetime]]:
+    output: list[tuple[datetime, datetime]] = []
+    i = 0
+    j = 0
+    while i < len(left) and j < len(right):
+        left_start, left_end = left[i]
+        right_start, right_end = right[j]
+
+        overlap_start = max(left_start, right_start)
+        overlap_end = min(left_end, right_end)
+        if overlap_end > overlap_start:
+            output.append((overlap_start, overlap_end))
+
+        if left_end <= right_end:
+            i += 1
+        else:
+            j += 1
+
+    return output
+
+
+def _ranges_to_windows(
+    ranges: list[tuple[datetime, datetime]],
+    avg_range_km: float,
+) -> list[dict[str, Any]]:
+    return [
+        {
+            "start": _to_iso_z(start_dt),
+            "end": _to_iso_z(end_dt),
+            "avg_range_km": avg_range_km,
+        }
+        for start_dt, end_dt in ranges
+    ]
+
+
 def build_contact_plan(
     nodes_payload: list[dict[str, Any]],
     generation_start: datetime,
@@ -146,7 +224,7 @@ def build_contact_plan(
         if isinstance(item, dict) and isinstance(item.get("node_id"), str)
     }
 
-    contact_plan: list[dict[str, Any]] = []
+    contacts_by_key: dict[tuple[str, str], dict[str, Any]] = {}
 
     for node in nodes_payload:
         if not isinstance(node, dict):
@@ -184,14 +262,50 @@ def build_contact_plan(
                 for item in windows
             ]
 
-            contact_plan.append(
-                {
-                    "source": src,
-                    "dest": dst,
-                    "bandwidth_bps": max(1, bandwidth_bps),
-                    "windows": windows_with_range,
-                }
-            )
+            contacts_by_key[(src, dst)] = {
+                "source": src,
+                "dest": dst,
+                "bandwidth_bps": max(1, bandwidth_bps),
+                "windows": windows_with_range,
+                "_avg_range_km": avg_range_km,
+            }
+
+    processed_pairs: set[tuple[str, str]] = set()
+    for (src, dst), contact in list(contacts_by_key.items()):
+        if (src, dst) in processed_pairs:
+            continue
+
+        src_node = node_by_id.get(src)
+        dst_node = node_by_id.get(dst)
+        if src_node is None or dst_node is None:
+            processed_pairs.add((src, dst))
+            continue
+
+        if not (_is_satellite_like(src_node) and _is_satellite_like(dst_node)):
+            processed_pairs.add((src, dst))
+            continue
+
+        reverse = contacts_by_key.get((dst, src))
+        if reverse is None:
+            contact["windows"] = []
+            processed_pairs.add((src, dst))
+            continue
+
+        forward_ranges = _windows_to_ranges(contact.get("windows", []))
+        reverse_ranges = _windows_to_ranges(reverse.get("windows", []))
+        mutual_ranges = _intersect_ranges(forward_ranges, reverse_ranges)
+
+        contact["windows"] = _ranges_to_windows(mutual_ranges, float(contact.get("_avg_range_km", 0.0)))
+        reverse["windows"] = _ranges_to_windows(mutual_ranges, float(reverse.get("_avg_range_km", 0.0)))
+
+        processed_pairs.add((src, dst))
+        processed_pairs.add((dst, src))
+
+    contact_plan = []
+    for contact in contacts_by_key.values():
+        clean = dict(contact)
+        clean.pop("_avg_range_km", None)
+        contact_plan.append(clean)
 
     contact_plan.sort(key=lambda c: (c["source"], c["dest"]))
     return contact_plan

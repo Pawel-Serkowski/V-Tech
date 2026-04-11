@@ -15,7 +15,7 @@ import {
 
 const PAGE_SIZE = 12;
 
-export default function PacketsPage({ packets, loading, cancellingPacketIds, onCancelPacket }) {
+export default function PacketsPage({ packets, loading, cancellingPacketIds, onCancelPacket, onClearPackets }) {
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("");
   const [source, setSource] = useState("");
@@ -47,8 +47,21 @@ export default function PacketsPage({ packets, loading, cancellingPacketIds, onC
     <section className="stack-lg">
       <article className="surface-card">
         <header className="surface-head">
-          <h2>Wyslane pakiety</h2>
-          <p className="muted">Filtrowanie, paginacja i szybkie przejscie do szczegolow procesu dostarczenia.</p>
+          <div>
+            <h2>Wyslane pakiety</h2>
+            <p className="muted">Filtrowanie, paginacja i szybkie przejscie do szczegolow procesu dostarczenia.</p>
+          </div>
+          <button
+            className="btn danger"
+            type="button"
+            onClick={() => {
+              if (window.confirm("Czy na pewno chcesz usunąć WSZYSTKIE pakiety?")) {
+                onClearPackets?.();
+              }
+            }}
+          >
+            Usuń pakiety
+          </button>
         </header>
 
         <div className="filter-grid">

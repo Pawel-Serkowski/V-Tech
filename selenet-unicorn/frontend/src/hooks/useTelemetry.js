@@ -4,6 +4,7 @@ import {
   WS_STATUS_URL,
   cancelPacket,
   createPacket,
+  deletePackets,
   fetchDispatchContext,
   fetchNodes,
   fetchPacket,
@@ -113,10 +114,42 @@ export function useTelemetry() {
       socket.onmessage = (event) => {
         try {
           const parsed = JSON.parse(event.data);
-          setEvents((current) => [parsed, ...current].slice(0, 30));
-          refreshTelemetry().catch(() => {
-            // Ignore transient fetch failures.
-          });
+          if (parsed.kind === "packets-cleared") {
+            setPackets([]);
+            setQueueLoad([]);
+            setEvents([]);
+          } else {
+            const event = parsed;
+            setEvents((current) => [event, ...current].slice(0, 30));
+
+            // Instant telemetry update for smooth animations
+            if (event.kind === "packet-status" && event.packet_id) {
+              setPackets((currentPackets) => {
+                const index = currentPackets.findIndex((p) => p.packet_id === event.packet_id);
+                if (index === -1) {
+                   return currentPackets; // Unknown packet, wait for poll
+                }
+                const newPackets = [...currentPackets];
+                newPackets[index] = {
+                  ...newPackets[index],
+                  current_status: event.status,
+                  current_node_id: event.node_id,
+                  current_hop_index: event.hop_index,
+                  hop_total: event.hop_total,
+                  from_node: event.from_node,
+                  to_node: event.to_node,
+                  next_hop: event.next_hop,
+                  time_elapsed: event.time_elapsed,
+                  ttl_remaining: event.ttl_remaining,
+                };
+                return newPackets;
+              });
+            }
+
+            refreshTelemetry().catch(() => {
+              // Background poll to keep authoritative state in sync
+            });
+          }
         } catch {
           // Ignore malformed event payloads.
         }
@@ -217,6 +250,19 @@ export function useTelemetry() {
     [clearFeedback, refreshDispatch, refreshNodes]
   );
 
+  const clearTelemetry = useCallback(async () => {
+    clearFeedback();
+    try {
+      await deletePackets();
+      setPackets([]);
+      setEvents([]);
+      setQueueLoad([]);
+      setMessage("Wszystkie pakiety zostaly usuniete.");
+    } catch (err) {
+      setError(err.message || "Failed to clear packets.");
+    }
+  }, [clearFeedback]);
+
   const loadPacket = useCallback(async (packetId) => {
     return fetchPacket(packetId);
   }, []);
@@ -231,6 +277,7 @@ export function useTelemetry() {
       saveNodes,
       saveNodesFromFile,
       loadPacket,
+      clearTelemetry,
       setError,
       setMessage,
     }),

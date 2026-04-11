@@ -149,9 +149,18 @@ class PacketSummary(BaseModel):
     cancel_requested: bool = False
     cancel_requested_at: datetime | None = None
     next_hop: str | None = None
+    current_node_id: str | None = None
+    current_hop_index: int | None = None
+    hop_total: int | None = None
+    from_node: str | None = None
+    to_node: str | None = None
+    time_elapsed: float | None = None
+    ttl_remaining: float | None = None
     route_hops: list[str] = Field(default_factory=list)
     route_locations: dict[str, str] = Field(default_factory=dict)
     earth_timestamp: datetime
+    simulation_real_anchor: datetime | None = None
+    simulation_acceleration: float | None = None
     status_history: list[dict[str, Any]] = Field(default_factory=list)
 
 

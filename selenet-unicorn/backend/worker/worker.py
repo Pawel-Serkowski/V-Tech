@@ -2,11 +2,17 @@ import asyncio
 import json
 import os
 import sys
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 from app.cgr import CGREngine
+from app.simulation_time import (
+    now_utc,
+    packet_simulation_now,
+    packet_sleep_seconds_for_simulation_delta,
+)
+from app.utils2 import flatten_nodes_to_contact_plan
 
 import aio_pika
 import httpx
@@ -185,15 +191,8 @@ def _load_contact_plan() -> list[dict[str, Any]]:
                 payload = json.load(handle)
         except Exception as exc:
             print(f"[worker2:{NODE_ID}] failed to read CONTACT_PLAN_PATH: {exc}")
-            
+
     if isinstance(payload, list):
-        # TUTAJ NAPRAWIAMY BŁĄD DAT: Zamieniamy stringi na obiekty datetime
-        for contact in payload:
-            for window in contact.get("windows", []):
-                if isinstance(window.get("start"), str):
-                    window["start"] = _to_utc_datetime(window["start"])
-                if isinstance(window.get("end"), str):
-                    window["end"] = _to_utc_datetime(window["end"])
         return payload
 
     return []
@@ -229,6 +228,8 @@ def _load_static_link_metrics() -> dict[str, dict[str, float]]:
 
 CONTACT_PLAN = _load_contact_plan()
 STATIC_LINK_METRICS = _load_static_link_metrics()
+CURRENT_NODES: list[dict[str, Any]] = []
+CURRENT_NODES_BY_ID: dict[str, dict[str, Any]] = {}
 _LINK_LOCKS: dict[str, asyncio.Lock] = {}
 _CONTACT_PLAN_LAST_REFRESH = datetime.min.replace(tzinfo=timezone.utc)
 _CONTACT_PLAN_REFRESH_LOCK = asyncio.Lock()
@@ -271,71 +272,45 @@ def _extract_link_metrics_from_data(
     return max(1, DEFAULT_BANDWIDTH_BPS), max(1.0, DEFAULT_RANGE_KM)
 
 
+def _retry_after_simulation_seconds(packet_data: dict[str, Any]) -> int:
+    acceleration = max(1.0, _to_float(packet_data.get("simulation_acceleration"), 1.0))
+    # Keep retry cadence close to contact-plan refresh in real-time, even when sim runs much faster.
+    return max(2, int(CONTACT_PLAN_REFRESH_SECONDS * acceleration))
+
+
 def _flatten_nodes_to_contact_plan(nodes: Any) -> list[dict[str, Any]]:
     if not isinstance(nodes, list):
         return []
+    return flatten_nodes_to_contact_plan(nodes)
 
-    contact_plan: list[dict[str, Any]] = []
-    for node in nodes:
-        if not isinstance(node, dict):
-            continue
 
-        source_id = node.get("node_id")
-        if not isinstance(source_id, str) or not source_id.strip():
-            continue
-        source_id = source_id.strip()
-
-        shared_windows = node.get("contact_windows") if isinstance(node.get("contact_windows"), list) else []
-
-        for link in node.get("links", []):
-            if isinstance(link, str):
-                contact_plan.append(
-                    {
-                        "source": source_id,
-                        "dest": link,
-                        "bandwidth_bps": DEFAULT_BANDWIDTH_BPS,
-                        "windows": shared_windows,
-                    }
-                )
-                continue
-
-            if not isinstance(link, dict):
-                continue
-
-            dest_node = link.get("dest_node")
-            if not isinstance(dest_node, str) or not dest_node.strip():
-                continue
-
-            windows = link.get("windows", [])
-            if not isinstance(windows, list):
-                windows = []
-
-            contact_plan.append(
-                {
-                    "source": source_id,
-                    "dest": dest_node,
-                    "bandwidth_bps": _to_int(link.get("bandwidth_bps"), DEFAULT_BANDWIDTH_BPS),
-                    "windows": windows,
-                }
-            )
-
-    return contact_plan
+def _simulation_now_for_packet(
+    packet_data: dict[str, Any],
+    fallback_contact_plan: list[dict[str, Any]] | None = None,
+) -> datetime:
+    return packet_simulation_now(
+        packet_data,
+        real_now=now_utc(),
+        fallback_contact_plan=fallback_contact_plan,
+    )
 
 
 async def _refresh_contact_plan_if_needed(client: httpx.AsyncClient) -> None:
     global CONTACT_PLAN
+    global CURRENT_NODES
+    global CURRENT_NODES_BY_ID
     global _CONTACT_PLAN_LAST_REFRESH
 
     # If worker has static contact plan configured, keep it as source of truth.
     if CONTACT_PLAN_PATH or CONTACT_PLAN_JSON:
         return
 
-    now = datetime.now(timezone.utc)
+    now = now_utc()
     if (now - _CONTACT_PLAN_LAST_REFRESH).total_seconds() < CONTACT_PLAN_REFRESH_SECONDS:
         return
 
     async with _CONTACT_PLAN_REFRESH_LOCK:
-        now = datetime.now(timezone.utc)
+        now = now_utc()
         if (now - _CONTACT_PLAN_LAST_REFRESH).total_seconds() < CONTACT_PLAN_REFRESH_SECONDS:
             return
 
@@ -352,10 +327,35 @@ async def _refresh_contact_plan_if_needed(client: httpx.AsyncClient) -> None:
             refreshed = _flatten_nodes_to_contact_plan(nodes)
             if refreshed:
                 CONTACT_PLAN = refreshed
+            if isinstance(nodes, list):
+                CURRENT_NODES = [item for item in nodes if isinstance(item, dict)]
+                CURRENT_NODES_BY_ID = {
+                    item.get("node_id"): item
+                    for item in CURRENT_NODES
+                    if isinstance(item.get("node_id"), str)
+                }
             _CONTACT_PLAN_LAST_REFRESH = now
         except Exception as exc:
             print(f"[worker2:{NODE_ID}] nodes refresh error: {exc}")
             _CONTACT_PLAN_LAST_REFRESH = now
+
+
+def _is_link_hardware_allowed(
+    from_node: str,
+    to_node: str,
+    start_tx: datetime,
+    end_rx: datetime,
+    nodes_by_id: dict[str, dict[str, Any]],
+) -> bool:
+    source_doc = nodes_by_id.get(from_node)
+    dest_doc = nodes_by_id.get(to_node)
+    if not source_doc or not dest_doc:
+        return True
+
+    return (
+        CGREngine.is_link_hardware_allowed(source_doc, dest_doc, at=start_tx)
+        and CGREngine.is_link_hardware_allowed(source_doc, dest_doc, at=end_rx)
+    )
 
 
 def _find_contact_window(
@@ -516,13 +516,14 @@ async def _wait_until_arrival_if_needed(
     if not_before is None:
         return
 
-    now = datetime.now(timezone.utc)
+    now = _simulation_now_for_packet(data, fallback_contact_plan=CONTACT_PLAN)
     if now >= not_before:
         return
 
-    wait_seconds = (not_before - now).total_seconds()
+    wait_simulation_seconds = (not_before - now).total_seconds()
+    wait_seconds = packet_sleep_seconds_for_simulation_delta(data, wait_simulation_seconds)
     print(
-        f"[worker2:{NODE_ID}] packet {packet_id} waiting {wait_seconds:.3f}s for propagation arrival"
+        f"[worker2:{NODE_ID}] packet {packet_id} waiting {wait_seconds:.3f}s real-time for propagation arrival"
     )
     await asyncio.sleep(wait_seconds)
 
@@ -547,6 +548,7 @@ async def _process_message(
 
         await _wait_until_arrival_if_needed(data, packet_id)
 
+
         current_node = _as_node_id(data.get("current_node"), NODE_ID)
         source_node = _as_node_id(data.get("source_node"), NODE_ID)
 
@@ -562,11 +564,13 @@ async def _process_message(
         if NODE_LOCATION and NODE_ID not in route_locations:
             route_locations[NODE_ID] = NODE_LOCATION
 
-        now = datetime.now(timezone.utc)
+        now = _simulation_now_for_packet(data, fallback_contact_plan=CONTACT_PLAN)
         time_elapsed, ttl_remaining = _ttl_metrics(data, now)
 
         await _refresh_contact_plan_if_needed(client)
         current_contact_plan = CONTACT_PLAN
+        current_nodes = list(CURRENT_NODES)
+        current_nodes_by_id = dict(CURRENT_NODES_BY_ID)
 
         if ttl_remaining is not None and ttl_remaining <= 0:
             await _notify_backend(
@@ -628,26 +632,6 @@ async def _process_message(
             )
             return
 
-        await _notify_backend(
-            client=client,
-            packet_id=packet_id,
-            status="IN_TRANSIT",
-            next_hop=to_node,
-            detail=(
-                f"Hop {hop_index}/{hop_total}: "
-                f"{_node_label(current_node, route_locations)} -> {_node_label(to_node, route_locations)}."
-            ),
-            node_id=current_node,
-            hop_index=hop_index,
-            hop_total=hop_total,
-            from_node=current_node,
-            to_node=to_node,
-            from_location=from_location,
-            to_location=to_location,
-            time_elapsed=time_elapsed,
-            ttl_remaining=ttl_remaining,
-        )
-
         forwarded_envelope = {
             "packet_id": packet_id,
             "source_node": source_node,
@@ -660,6 +644,8 @@ async def _process_message(
             "route_hops": route_hops,
             "route_locations": route_locations,
             "earth_timestamp": data.get("earth_timestamp"),
+            "simulation_real_anchor": data.get("simulation_real_anchor"),
+            "simulation_acceleration": data.get("simulation_acceleration"),
             "ttl_seconds": data.get("ttl_seconds"),
             "hop_limit": data.get("hop_limit"),
             "expire_at": data.get("expire_at"),
@@ -672,7 +658,7 @@ async def _process_message(
         lock = _get_link_lock(current_node, to_node)
 
         async with lock:
-            lock_now = datetime.now(timezone.utc)
+            lock_now = _simulation_now_for_packet(data, fallback_contact_plan=current_contact_plan)
             window_start, window_end, bandwidth_bps, avg_range_km = _find_contact_window(
                 current_node,
                 to_node,
@@ -697,9 +683,11 @@ async def _process_message(
             if has_window and window_start is not None:
                 wait_for_window_seconds = max(0.0, (window_start - lock_now).total_seconds())
                 if wait_for_window_seconds > 0:
-                    await asyncio.sleep(wait_for_window_seconds)
+                    await asyncio.sleep(
+                        packet_sleep_seconds_for_simulation_delta(data, wait_for_window_seconds)
+                    )
 
-            now_before_tx = datetime.now(timezone.utc)
+            now_before_tx = _simulation_now_for_packet(data, fallback_contact_plan=current_contact_plan)
             _, ttl_remaining_before_tx = _ttl_metrics(data, now_before_tx)
             if ttl_remaining_before_tx is not None and ttl_remaining_before_tx <= 0:
                 await _notify_backend(
@@ -743,30 +731,70 @@ async def _process_message(
                 )
                 return
 
-            start_tx = datetime.now(timezone.utc)
-            
+            start_tx = _simulation_now_for_packet(data, fallback_contact_plan=current_contact_plan)
+
             needs_reroute = False
-            
+            reroute_reason = ""
+            end_rx_expected = start_tx.timestamp() + transmission_delay + propagation_delay
+
             if not has_window:
-                needs_reroute = True  
+                needs_reroute = True
+                reroute_reason = "no active contact window"
             else:
-                end_rx_expected = start_tx.timestamp() + transmission_delay + propagation_delay
                 if end_rx_expected > window_end.timestamp():
-                    needs_reroute = True # there is a window but we cant make it in time
+                    needs_reroute = True
+                    reroute_reason = "window closes before transmission can complete"
+
+                if not needs_reroute:
+                    end_rx_dt = datetime.fromtimestamp(end_rx_expected, tz=timezone.utc)
+                    if not _is_link_hardware_allowed(
+                        current_node,
+                        to_node,
+                        start_tx,
+                        end_rx_dt,
+                        current_nodes_by_id,
+                    ):
+                        needs_reroute = True
+                        reroute_reason = "hardware geometry constraint (LOS/cone) failed"
                     
             if needs_reroute:
                 reroute_count = _to_int(data.get("reroute_count"), 0)
-                print(f"[worker2:{NODE_ID}] Original route failed or no window. Attempting local re-routing for {packet_id}")
+                print(
+                    f"[worker2:{NODE_ID}] hop blocked ({reroute_reason}) for {packet_id}. "
+                    "Attempting local re-routing"
+                )
                 
                 if reroute_count >= MAX_LOCAL_REROUTE_ATTEMPTS:
-                    print(f"[worker2:{NODE_ID}] Max local reroute attempts reached for {packet_id}!!!. Dropping.")
+                    retry_after_seconds = _retry_after_simulation_seconds(data)
+                    data["not_before"] = (
+                        _simulation_now_for_packet(data, fallback_contact_plan=current_contact_plan)
+                        + timedelta(seconds=retry_after_seconds)
+                    ).isoformat()
                     await _notify_backend(
                         client=client,
                         packet_id=packet_id,
-                        status="FAILED",
-                        next_hop=to_node,
-                        detail=f"Exceeded {MAX_LOCAL_REROUTE_ATTEMPTS} local reroute attempts.",
-                        node_id=current_node
+                        status="WAITING_RETRY",
+                        next_hop=None,
+                        detail=(
+                            f"Hop blocked ({reroute_reason}). Waiting {retry_after_seconds}s for a new "
+                            "hardware geometry opportunity."
+                        ),
+                        node_id=current_node,
+                        hop_index=hop_index,
+                        hop_total=hop_total,
+                        from_node=current_node,
+                        to_node=to_node,
+                        from_location=from_location,
+                        to_location=to_location,
+                        time_elapsed=time_elapsed,
+                        ttl_remaining=ttl_remaining,
+                    )
+                    await _forward_to_next_node(
+                        channel=channel,
+                        declared_queues=declared_queues,
+                        envelope=data,
+                        to_node=current_node,
+                        rabbit_priority=message.priority,
                     )
                     return
 
@@ -776,10 +804,14 @@ async def _process_message(
                     source_node=current_node,
                     destination_node=data.get("destination_node"),
                     contact_plan=current_contact_plan,
-                    earth_timestamp=datetime.now(timezone.utc),
+                    earth_timestamp=_simulation_now_for_packet(
+                        data,
+                        fallback_contact_plan=current_contact_plan,
+                    ),
                     packet_size_bytes=packet_size_bytes,
                     ttl_seconds=int(ttl_remaining or 3600),
-                    hop_limit=int(data.get("hop_limit", 10))
+                    hop_limit=int(data.get("hop_limit", 10)),
+                    nodes=current_nodes,
                 )
 
                 if new_route:
@@ -792,29 +824,65 @@ async def _process_message(
                         channel=channel,
                         declared_queues=declared_queues,
                         envelope=data, 
-                        to_node=NODE_ID, 
+                        to_node=current_node,
                         rabbit_priority=message.priority
                     )
                     return 
                 else:
-                    print(f"[worker2:{NODE_ID}] No alternative route found for {packet_id}. Dropping.")
+                    retry_after_seconds = _retry_after_simulation_seconds(data)
+                    data["not_before"] = (
+                        _simulation_now_for_packet(data, fallback_contact_plan=current_contact_plan)
+                        + timedelta(seconds=retry_after_seconds)
+                    ).isoformat()
                     await _notify_backend(
                         client=client,
                         packet_id=packet_id,
-                        status="FAILED",
-                        next_hop=to_node,
-                        detail="Route failed (no valid window) and no alternative route could be calculated.",
+                        status="WAITING_RETRY",
+                        next_hop=None,
+                        detail=(
+                            f"Hop blocked ({reroute_reason}); no alternative route now. "
+                            f"Retry in {retry_after_seconds}s from {_node_label(current_node, route_locations)}."
+                        ),
                         node_id=current_node,
                         hop_index=hop_index,
                         hop_total=hop_total,
                         from_node=current_node,
                         to_node=to_node,
                     )
-                    return #rejection of a packet, because there is no possible way to find route in a given ttl time
+                    await _forward_to_next_node(
+                        channel=channel,
+                        declared_queues=declared_queues,
+                        envelope=data,
+                        to_node=current_node,
+                        rabbit_priority=message.priority,
+                    )
+                    return
+
+            await _notify_backend(
+                client=client,
+                packet_id=packet_id,
+                status="IN_TRANSIT",
+                next_hop=to_node,
+                detail=(
+                    f"Hop {hop_index}/{hop_total}: "
+                    f"{_node_label(current_node, route_locations)} -> {_node_label(to_node, route_locations)}."
+                ),
+                node_id=current_node,
+                hop_index=hop_index,
+                hop_total=hop_total,
+                from_node=current_node,
+                to_node=to_node,
+                from_location=from_location,
+                to_location=to_location,
+                time_elapsed=time_elapsed,
+                ttl_remaining=ttl_remaining,
+            )
                     
-            await asyncio.sleep(transmission_delay)
+            await asyncio.sleep(
+                packet_sleep_seconds_for_simulation_delta(data, transmission_delay)
+            )
             arrival_time = datetime.fromtimestamp(
-                start_tx.timestamp() + transmission_delay + propagation_delay,
+                end_rx_expected,
                 tz=timezone.utc,
             )
             forwarded_envelope["not_before"] = arrival_time.isoformat()
@@ -851,9 +919,11 @@ async def _process_message(
                     rabbit_priority=message.priority,
                 )
             else:
-                await asyncio.sleep(propagation_delay)
+                await asyncio.sleep(
+                    packet_sleep_seconds_for_simulation_delta(data, propagation_delay)
+                )
 
-        now_after_hop = datetime.now(timezone.utc)
+        now_after_hop = _simulation_now_for_packet(data, fallback_contact_plan=current_contact_plan)
         time_elapsed_after_hop, ttl_remaining_after_hop = _ttl_metrics(data, now_after_hop)
         if ttl_remaining_after_hop is not None and ttl_remaining_after_hop <= 0:
             await _notify_backend(

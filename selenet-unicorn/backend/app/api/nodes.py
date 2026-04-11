@@ -24,9 +24,49 @@ NODE_TYPE_ALIASES: dict[str, str] = {
 }
 
 
+def _serialize_window(window: Any) -> dict[str, Any] | None:
+    """Serialize a single contact window dict to a JSON-safe form.
+
+    Converts datetime objects to ISO-8601 UTC strings and preserves any
+    additional numeric fields (e.g. avg_range_km) that may be stored alongside
+    start/end timestamps.
+    """
+    if not isinstance(window, dict):
+        return None
+
+    raw_start = window.get("start")
+    raw_end = window.get("end")
+
+    if raw_start is None or raw_end is None:
+        return None
+
+    serialized: dict[str, Any] = {
+        "start": raw_start.isoformat() if isinstance(raw_start, datetime) else raw_start,
+        "end": raw_end.isoformat() if isinstance(raw_end, datetime) else raw_end,
+    }
+
+    # Preserve optional numeric fields so workers and the visualizer can use them.
+    for extra_key in ("avg_range_km", "bandwidth_bps"):
+        if extra_key in window:
+            serialized[extra_key] = window[extra_key]
+
+    return serialized
+
+
 def _serialize_node(node: dict[str, Any]) -> dict[str, Any]:
     node.pop("_id", None)
-    shared_windows = node.get("contact_windows") if isinstance(node.get("contact_windows"), list) else []
+
+    # contact_windows are shared across all string-style links.  We serialize
+    # them here once so that they are always proper ISO strings regardless of
+    # whether MongoDB returned datetime objects or raw strings.
+    raw_shared = node.get("contact_windows")
+    shared_windows: list[dict[str, Any]] = []
+    if isinstance(raw_shared, list):
+        for w in raw_shared:
+            serialized_w = _serialize_window(w)
+            if serialized_w is not None:
+                shared_windows.append(serialized_w)
+
     serialized_links = []
     for link in node.get("links", []):
         if isinstance(link, str):
@@ -43,19 +83,18 @@ def _serialize_node(node: dict[str, Any]) -> dict[str, Any]:
 
         windows = []
         for window in link.get("windows", []):
-            if not isinstance(window, dict):
-                continue
-            windows.append({
-                "start": window["start"].isoformat() if isinstance(window["start"], datetime) else window["start"],
-                "end": window["end"].isoformat() if isinstance(window["end"], datetime) else window["end"]
-            })
+            serialized_w = _serialize_window(window)
+            if serialized_w is not None:
+                windows.append(serialized_w)
+
         serialized_links.append({
-            "dest_node": link.get("dest_node"),
+            "dest_node": link.get("dest_node") or link.get("destination"),
             "bandwidth_bps": link.get("bandwidth_bps", 1000000),
-            "windows": windows
+            "windows": windows,
         })
+
     node["links"] = serialized_links
-    node.pop("contact_windows", None)
+    node["contact_windows"] = shared_windows
     return node
 
 
@@ -159,9 +198,9 @@ async def _upsert_nodes(validated_nodes: list[NodeConfig], replace: bool = False
 
     for node in validated_nodes:
         node_payload = node.model_dump(mode="json")
-        result = await db.nodes.update_one(
+        result = await db.nodes.replace_one(
             {"node_id": node.node_id},
-            {"$set": node_payload},
+            node_payload,
             upsert=True,
         )
 

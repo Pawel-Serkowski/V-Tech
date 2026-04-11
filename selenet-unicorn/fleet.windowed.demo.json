@@ -1,0 +1,98 @@
+{
+  "nodes": [
+    {
+      "node_id": "EARTH_GATEWAY",
+      "node_type": "ground_station",
+      "body": "earth",
+      "orbit": "Earth Surface",
+      "location_label": "Earth Mission Control",
+      "surface_lat_deg": 0.0,
+      "surface_lon_deg": 0.0,
+      "time_offset_seconds": 0,
+      "links": [
+        {
+          "dest_node": "SAT_1",
+          "bandwidth_bps": 1000000,
+          "windows": [
+            {
+              "start": "2026-01-02T00:00:00Z",
+              "end": "2026-01-02T00:10:00Z"
+            },
+            {
+              "start": "2026-01-02T12:00:00Z",
+              "end": "2026-01-02T12:10:00Z"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "node_id": "SAT_1",
+      "node_type": "satellite",
+      "body": "earth",
+      "orbit": "Cislunar Relay",
+      "location_label": "NRHO Plane A",
+      "orbit_altitude_km": 2800,
+      "orbital_inclination_deg": 12,
+      "orbital_phase_deg": 24,
+      "time_offset_seconds": 1,
+      "links": [
+        {
+          "dest_node": "EARTH_GATEWAY",
+          "bandwidth_bps": 1000000,
+          "windows": [
+            {
+              "start": "2026-01-02T00:00:00Z",
+              "end": "2026-01-02T00:10:00Z"
+            },
+            {
+              "start": "2026-01-02T12:00:00Z",
+              "end": "2026-01-02T12:10:00Z"
+            }
+          ]
+        },
+        {
+          "dest_node": "LUNAR_GATEWAY",
+          "bandwidth_bps": 1000000,
+          "windows": [
+            {
+              "start": "2026-01-02T00:00:00Z",
+              "end": "2026-01-02T00:10:00Z"
+            },
+            {
+              "start": "2026-01-02T12:00:00Z",
+              "end": "2026-01-02T12:10:00Z"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "node_id": "LUNAR_GATEWAY",
+      "node_type": "relay",
+      "body": "moon",
+      "orbit": "NRHO",
+      "location_label": "Lunar Gateway Hub",
+      "orbit_altitude_km": 3300,
+      "orbital_inclination_deg": 10,
+      "orbital_phase_deg": 140,
+      "time_offset_seconds": 2,
+      "links": [
+        {
+          "dest_node": "SAT_1",
+          "bandwidth_bps": 1000000,
+          "windows": [
+            {
+              "start": "2026-01-02T00:00:00Z",
+              "end": "2026-01-02T00:10:00Z"
+            },
+            {
+              "start": "2026-01-02T12:00:00Z",
+              "end": "2026-01-02T12:10:00Z"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

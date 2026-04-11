@@ -8,6 +8,7 @@ from ..cgr import CGREngine
 from ..db import get_database
 from ..models import PacketAck, PacketCreate, PacketStatusUpdate, PacketSummary, QueueLoadItem
 from ..rabbitmq import packet_queue_name_for_node, rabbit_publisher
+from ..simulation_time import get_time_acceleration, now_utc, resolve_simulation_now
 from ..websocket_manager import ws_manager
 from ..utils2 import flatten_nodes_to_contact_plan, estimate_packet_size
 
@@ -82,11 +83,13 @@ def _extract_link_destinations(node: dict[str, Any]) -> list[str]:
 @router.post("", response_model=PacketAck, status_code=202)
 async def ingest_packet(packet: PacketCreate) -> PacketAck:
     db = get_database()
-    earth_timestamp = datetime.now(timezone.utc)
+    real_now = now_utc()
     
     nodes_raw = await db.nodes.find({}, {"_id": 0}).to_list(length=5000)
     
     contact_plan = flatten_nodes_to_contact_plan(nodes_raw)
+    earth_timestamp = resolve_simulation_now(contact_plan=contact_plan, real_now=real_now)
+    simulation_acceleration = get_time_acceleration()
     
     packet_size = estimate_packet_size(packet.payload)
 
@@ -104,6 +107,11 @@ async def ingest_packet(packet: PacketCreate) -> PacketAck:
     route_locations = _build_route_locations(packet.source_node, route_hops or [], nodes_raw)
 
     queue_status = "QUEUED_ON_EARTH" if next_hop else "WAITING_RETRY"
+    queue_detail = (
+        "Packet persisted and evaluated by CGR."
+        if next_hop
+        else "No valid route currently available (LOS/cone constraints or missing satellite relay path)."
+    )
 
     status_history = [
         {
@@ -114,7 +122,7 @@ async def ingest_packet(packet: PacketCreate) -> PacketAck:
         {
             "status": queue_status,
             "at": earth_timestamp,
-            "detail": "Packet persisted and evaluated by CGR.",
+            "detail": queue_detail,
             "next_hop": next_hop,
         },
     ]
@@ -128,6 +136,8 @@ async def ingest_packet(packet: PacketCreate) -> PacketAck:
         "priority": int(packet.priority),
         "payload": packet.payload,
         "earth_timestamp": earth_timestamp,
+        "simulation_real_anchor": real_now,
+        "simulation_acceleration": simulation_acceleration,
         "ttl_seconds":  packet.ttl_seconds,
         "hop_limit": packet.hop_limit,
         "expire_at": earth_timestamp + timedelta(seconds=packet.ttl_seconds),
@@ -155,6 +165,8 @@ async def ingest_packet(packet: PacketCreate) -> PacketAck:
             "route_hops": route_hops,
             "route_locations": route_locations,
             "earth_timestamp": earth_timestamp.isoformat(),
+            "simulation_real_anchor": real_now.isoformat(),
+            "simulation_acceleration": simulation_acceleration,
             "ttl_seconds": packet.ttl_seconds,
             "hop_limit": packet.hop_limit,
             "expire_at": (earth_timestamp + timedelta(seconds=packet.ttl_seconds)).isoformat(),
@@ -303,6 +315,10 @@ async def register_status_update(update: PacketStatusUpdate) -> dict[str, Any]:
         set_payload["time_elapsed"] = update.time_elapsed
     if update.ttl_remaining is not None:
         set_payload["ttl_remaining"] = update.ttl_remaining
+    if update.from_node is not None:
+        set_payload["from_node"] = update.from_node
+    if update.to_node is not None:
+        set_payload["to_node"] = update.to_node
 
     history_row = {
         "status": update.status,
@@ -357,7 +373,7 @@ async def register_status_update(update: PacketStatusUpdate) -> dict[str, Any]:
 @router.post("/{packet_id}/cancel")
 async def cancel_packet(packet_id: str):
     db = get_database()
-    cancelled_at = datetime.now(timezone.utc)
+    cancelled_at = now_utc()
 
     packet_row = await db.packets.find_one(
         {"packet_id": packet_id},
@@ -477,3 +493,15 @@ async def get_packet(packet_id: str) -> PacketSummary:
         raise HTTPException(status_code=404, detail="Packet not found.")
 
     return PacketSummary.model_validate(_serialize_packet(row))
+
+
+@router.delete("", status_code=204)
+async def clear_all_packets():
+    db = get_database()
+    await db.packets.delete_many({})
+    
+    await ws_manager.broadcast({
+        "kind": "packets-cleared",
+        "at": now_utc().isoformat()
+    })
+    return None

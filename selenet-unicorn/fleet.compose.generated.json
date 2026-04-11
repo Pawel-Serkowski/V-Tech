@@ -15,8 +15,24 @@
           "bandwidth_bps": 1000000,
           "windows": [
             {
-              "start": "2026-01-01T00:00:00Z",
-              "end": "2028-01-01T00:00:00Z"
+              "start": "2026-04-11T12:00:00Z",
+              "end": "2026-04-11T12:40:00Z"
+            },
+            {
+              "start": "2026-04-11T13:00:00Z",
+              "end": "2026-04-11T13:40:00Z"
+            },
+            {
+              "start": "2026-04-11T14:00:00Z",
+              "end": "2026-04-11T14:40:00Z"
+            },
+            {
+              "start": "2026-04-11T15:00:00Z",
+              "end": "2026-04-11T15:40:00Z"
+            },
+            {
+              "start": "2026-04-11T16:00:00Z",
+              "end": "2026-04-11T16:40:00Z"
             }
           ]
         },
@@ -226,8 +242,8 @@
       "body": "earth",
       "orbiting_body": "earth",
       "orbit_altitude_km": 680,
-      "orbital_inclination_deg": 28,
-      "orbital_phase_deg": 5,
+      "orbital_inclination_deg": 12,
+      "orbital_phase_deg": 0,
       "location_label": "LEO Relay A",
       "time_offset_seconds": 5,
       "links": [
@@ -236,8 +252,24 @@
           "bandwidth_bps": 1000000,
           "windows": [
             {
-              "start": "2026-01-01T00:00:00Z",
-              "end": "2028-01-01T00:00:00Z"
+              "start": "2026-04-11T12:00:00Z",
+              "end": "2026-04-11T12:40:00Z"
+            },
+            {
+              "start": "2026-04-11T13:00:00Z",
+              "end": "2026-04-11T13:40:00Z"
+            },
+            {
+              "start": "2026-04-11T14:00:00Z",
+              "end": "2026-04-11T14:40:00Z"
+            },
+            {
+              "start": "2026-04-11T15:00:00Z",
+              "end": "2026-04-11T15:40:00Z"
+            },
+            {
+              "start": "2026-04-11T16:00:00Z",
+              "end": "2026-04-11T16:40:00Z"
             }
           ]
         },
@@ -286,8 +318,24 @@
           "bandwidth_bps": 1000000,
           "windows": [
             {
-              "start": "2026-01-01T00:00:00Z",
-              "end": "2028-01-01T00:00:00Z"
+              "start": "2026-04-11T12:00:00Z",
+              "end": "2026-04-11T12:40:00Z"
+            },
+            {
+              "start": "2026-04-11T13:00:00Z",
+              "end": "2026-04-11T13:40:00Z"
+            },
+            {
+              "start": "2026-04-11T14:00:00Z",
+              "end": "2026-04-11T14:40:00Z"
+            },
+            {
+              "start": "2026-04-11T15:00:00Z",
+              "end": "2026-04-11T15:40:00Z"
+            },
+            {
+              "start": "2026-04-11T16:00:00Z",
+              "end": "2026-04-11T16:40:00Z"
             }
           ]
         }
@@ -298,9 +346,9 @@
       "node_type": "satellite",
       "body": "earth",
       "orbiting_body": "earth",
-      "orbit_altitude_km": 6800,
-      "orbital_inclination_deg": 55,
-      "orbital_phase_deg": 40,
+      "orbit_altitude_km": 2200,
+      "orbital_inclination_deg": 22,
+      "orbital_phase_deg": 24,
       "location_label": "MEO Relay B",
       "time_offset_seconds": 6,
       "links": [
@@ -624,8 +672,8 @@
       "body": "moon",
       "orbiting_body": "moon",
       "orbit_altitude_km": 3360,
-      "orbital_inclination_deg": 12,
-      "orbital_phase_deg": 0,
+      "orbital_inclination_deg": 2,
+      "orbital_phase_deg": 180,
       "location_label": "Lunar Gateway",
       "time_offset_seconds": 11,
       "links": [
@@ -634,8 +682,24 @@
           "bandwidth_bps": 1000000,
           "windows": [
             {
-              "start": "2026-01-01T00:00:00Z",
-              "end": "2028-01-01T00:00:00Z"
+              "start": "2026-04-11T12:00:00Z",
+              "end": "2026-04-11T12:40:00Z"
+            },
+            {
+              "start": "2026-04-11T13:00:00Z",
+              "end": "2026-04-11T13:40:00Z"
+            },
+            {
+              "start": "2026-04-11T14:00:00Z",
+              "end": "2026-04-11T14:40:00Z"
+            },
+            {
+              "start": "2026-04-11T15:00:00Z",
+              "end": "2026-04-11T15:40:00Z"
+            },
+            {
+              "start": "2026-04-11T16:00:00Z",
+              "end": "2026-04-11T16:40:00Z"
             }
           ]
         },
@@ -737,8 +801,8 @@
       "body": "moon",
       "orbiting_body": "moon",
       "orbit_altitude_km": 1460,
-      "orbital_inclination_deg": 55,
-      "orbital_phase_deg": 45,
+      "orbital_inclination_deg": 24,
+      "orbital_phase_deg": 205,
       "location_label": "Luna Orbiter A",
       "time_offset_seconds": 12,
       "links": [
@@ -790,8 +854,8 @@
       "body": "moon",
       "orbiting_body": "moon",
       "orbit_altitude_km": 2680,
-      "orbital_inclination_deg": 35,
-      "orbital_phase_deg": 180,
+      "orbital_inclination_deg": 18,
+      "orbital_phase_deg": 152,
       "location_label": "Luna Relay B",
       "time_offset_seconds": 13,
       "links": [
@@ -854,7 +918,7 @@
       "orbiting_body": "moon",
       "orbit_altitude_km": 920,
       "orbital_inclination_deg": 85,
-      "orbital_phase_deg": 90,
+      "orbital_phase_deg": 170,
       "location_label": "Lunar Relay Sat R1",
       "time_offset_seconds": 14,
       "links": [
@@ -937,7 +1001,7 @@
       "orbiting_body": "moon",
       "orbit_altitude_km": 1760,
       "orbital_inclination_deg": 85,
-      "orbital_phase_deg": 270,
+      "orbital_phase_deg": 196,
       "location_label": "Lunar Relay Sat R2",
       "time_offset_seconds": 15,
       "links": [

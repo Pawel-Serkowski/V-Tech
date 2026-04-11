@@ -44,6 +44,7 @@ export default function App() {
               loading={telemetry.loadingTelemetry}
               cancellingPacketIds={telemetry.cancellingPacketIds}
               onCancelPacket={telemetry.actions.requestCancel}
+              onClearPackets={telemetry.actions.clearTelemetry}
             />
           )}
         />

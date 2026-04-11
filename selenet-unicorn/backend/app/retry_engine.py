@@ -7,6 +7,7 @@ from .config import get_settings
 from .db import get_database
 from .models import PacketPriority
 from .rabbitmq import packet_queue_name_for_node, rabbit_publisher
+from .simulation_time import now_utc, packet_simulation_now, resolve_simulation_now
 from .utils2 import estimate_packet_size, flatten_nodes_to_contact_plan
 from .websocket_manager import ws_manager
 
@@ -109,7 +110,14 @@ class PacketRetryEngine:
     async def _retry_waiting_packets(self) -> None:
         settings = get_settings()
         db = get_database()
-        now = datetime.now(timezone.utc)
+
+        nodes = await db.nodes.find({}, {"_id": 0}).to_list(length=5000)
+        if not nodes:
+            return
+        contact_plan = flatten_nodes_to_contact_plan(nodes)
+
+        real_now = now_utc()
+        now = resolve_simulation_now(contact_plan=contact_plan, real_now=real_now)
 
         # Expire stale WAITING_RETRY packets before attempting re-routing.
         await db.packets.update_many(
@@ -131,11 +139,6 @@ class PacketRetryEngine:
                 },
             },
         )
-
-        nodes = await db.nodes.find({}, {"_id": 0}).to_list(length=5000)
-        if not nodes:
-            return
-        contact_plan = flatten_nodes_to_contact_plan(nodes)
 
         waiting_packets = await db.packets.find(
             {
@@ -161,20 +164,25 @@ class PacketRetryEngine:
         ).sort("earth_timestamp", 1).limit(settings.retry_batch_size).to_list(length=settings.retry_batch_size)
 
         for packet in waiting_packets:
+            packet_now = packet_simulation_now(
+                packet,
+                real_now=real_now,
+                fallback_contact_plan=contact_plan,
+            )
             expire_at = _as_utc(packet.get("expire_at"))
-            if isinstance(expire_at, datetime) and now > expire_at:
+            if isinstance(expire_at, datetime) and packet_now > expire_at:
                 detail = "Packet expired before a valid contact window opened."
                 await db.packets.update_one(
                     {"packet_id": packet["packet_id"], "current_status": "WAITING_RETRY"},
                     {
                         "$set": {
                             "current_status": "FAILED_EXPIRED",
-                            "updated_at": now,
+                            "updated_at": packet_now,
                         },
                         "$push": {
                             "status_history": {
                                 "status": "FAILED_EXPIRED",
-                                "at": now,
+                                "at": packet_now,
                                 "detail": detail,
                             }
                         },
@@ -186,14 +194,14 @@ class PacketRetryEngine:
                         "packet_id": packet["packet_id"],
                         "status": "FAILED_EXPIRED",
                         "detail": detail,
-                        "at": now.isoformat(),
+                        "at": packet_now.isoformat(),
                     }
                 )
                 continue
 
             remaining_ttl_seconds = packet.get("ttl_seconds", 3600)
             if isinstance(expire_at, datetime):
-                remaining_ttl_seconds = max(1, int((expire_at - now).total_seconds()))
+                remaining_ttl_seconds = max(1, int((expire_at - packet_now).total_seconds()))
 
             packet_size_bytes = estimate_packet_size(packet.get("payload", {}))
 
@@ -201,7 +209,7 @@ class PacketRetryEngine:
                 source_node=packet["source_node"],
                 destination_node=packet["destination_node"],
                 contact_plan=contact_plan,
-                earth_timestamp=now,
+                earth_timestamp=packet_now,
                 packet_size_bytes=packet_size_bytes,
                 ttl_seconds=remaining_ttl_seconds,
                 hop_limit=packet.get("hop_limit", 10),
@@ -227,12 +235,12 @@ class PacketRetryEngine:
                         "next_hop": next_hop,
                         "route_hops": route_hops,
                         "route_locations": route_locations,
-                        "updated_at": now,
+                        "updated_at": packet_now,
                     },
                     "$push": {
                         "status_history": {
                             "status": "QUEUED_ON_EARTH",
-                            "at": now,
+                            "at": packet_now,
                             "detail": detail,
                             "next_hop": next_hop,
                         }
@@ -255,6 +263,8 @@ class PacketRetryEngine:
                 "route_hops": route_hops,
                 "route_locations": route_locations,
                 "earth_timestamp": str(packet["earth_timestamp"]),
+                "simulation_real_anchor": packet.get("simulation_real_anchor"),
+                "simulation_acceleration": packet.get("simulation_acceleration"),
                 "ttl_seconds": int(remaining_ttl_seconds),
                 "hop_limit": int(packet.get("hop_limit", 10)),
                 "expire_at": expire_at.isoformat() if isinstance(expire_at, datetime) else None,
@@ -277,7 +287,7 @@ class PacketRetryEngine:
                     "route_hops": route_hops,
                     "route_locations": route_locations,
                     "detail": detail,
-                    "at": now.isoformat(),
+                    "at": packet_now.isoformat(),
                 }
             )
 

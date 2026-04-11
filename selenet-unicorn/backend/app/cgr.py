@@ -5,8 +5,13 @@ from typing import Any
 
 
 SPEED_OF_LIGHT_KM_S = 299792.458
-SATELLITE_CONE_HALF_ANGLE_DEG = 60.0  # 120 deg full cone aperture
+SATELLITE_CONE_HALF_ANGLE_DEG = 30.0  # 60 deg full cone aperture
 SATELLITE_CONE_MIN_DOT = math.cos(math.radians(SATELLITE_CONE_HALF_ANGLE_DEG))
+GROUND_STATION_MIN_DOT = 0.0  # Above local horizon: block only "through body" (180 deg opposite)
+EARTH_MU = 398600.4418
+MOON_MU = 4902.8001
+EARTH_ROT_RATE_RAD_S = (2 * math.pi) / 86164.0905
+MOON_ROT_RATE_RAD_S = (2 * math.pi) / (27.321661 * 86400.0)
 
 EARTH_CENTER = (0.0, 0.0, 0.0)
 EARTH_RADIUS_KM = 6371.0
@@ -78,7 +83,34 @@ def _body_center_and_radius(node: dict[str, Any]) -> tuple[tuple[float, float, f
     return EARTH_CENTER, EARTH_RADIUS_KM
 
 
-def _derive_orbital_position(node: dict[str, Any]) -> tuple[float, float, float] | None:
+def _surface_position(node: dict[str, Any], at_timestamp: float | None = None) -> tuple[float, float, float] | None:
+    raw_lat = node.get("surface_lat_deg")
+    raw_lon = node.get("surface_lon_deg")
+    try:
+        lat_deg = float(raw_lat)
+        lon_deg = float(raw_lon)
+    except (TypeError, ValueError):
+        return None
+    if not (math.isfinite(lat_deg) and math.isfinite(lon_deg)):
+        return None
+
+    center, radius_km = _body_center_and_radius(node)
+    body_text = str(node.get("body") or node.get("orbiting_body") or "").strip().lower()
+    rot_rate = MOON_ROT_RATE_RAD_S if body_text == "moon" else EARTH_ROT_RATE_RAD_S
+    t = float(at_timestamp or 0.0)
+
+    lat = math.radians(lat_deg)
+    lon = math.radians(lon_deg) + rot_rate * t
+    cos_lat = math.cos(lat)
+
+    return (
+        center[0] + radius_km * cos_lat * math.cos(lon),
+        center[1] + radius_km * cos_lat * math.sin(lon),
+        center[2] + radius_km * math.sin(lat),
+    )
+
+
+def _derive_orbital_position(node: dict[str, Any], at_timestamp: float | None = None) -> tuple[float, float, float] | None:
     center, radius_km = _body_center_and_radius(node)
 
     raw_alt = node.get("altitude_km")
@@ -100,9 +132,21 @@ def _derive_orbital_position(node: dict[str, Any]) -> tuple[float, float, float]
     except (TypeError, ValueError):
         incl_deg = 0.0
 
+    body_text = str(node.get("body") or node.get("orbiting_body") or "").strip().lower()
+    mu = MOON_MU if body_text == "moon" else EARTH_MU
+
     r = radius_km + max(0.0, altitude_km)
     phase = math.radians(phase_deg)
     incl = math.radians(incl_deg)
+
+    if at_timestamp is not None and math.isfinite(at_timestamp):
+        ang_vel = math.sqrt(mu / max(r ** 3, 1.0))
+        time_offset = 0.0
+        try:
+            time_offset = float(node.get("time_offset_seconds", 0.0))
+        except (TypeError, ValueError):
+            time_offset = 0.0
+        phase += ang_vel * (at_timestamp + time_offset)
 
     x_local = r * math.cos(phase)
     y_base = r * math.sin(phase)
@@ -112,7 +156,15 @@ def _derive_orbital_position(node: dict[str, Any]) -> tuple[float, float, float]
     return (center[0] + x_local, center[1] + y_local, center[2] + z_local)
 
 
-def _extract_position(node: dict[str, Any]) -> tuple[float, float, float] | None:
+def _extract_position(node: dict[str, Any], at_timestamp: float | None = None) -> tuple[float, float, float] | None:
+    node_type = str(node.get("node_type") or "").strip().lower()
+
+    if node_type == "ground_station":
+        # Ground hardware should stay mounted on the body surface and rotate with it.
+        surface = _surface_position(node, at_timestamp=at_timestamp)
+        if surface is not None:
+            return surface
+
     candidates = [
         (
             node.get("actual_position_x_km"),
@@ -134,7 +186,12 @@ def _extract_position(node: dict[str, Any]) -> tuple[float, float, float] | None
             continue
         if math.isfinite(x) and math.isfinite(y) and math.isfinite(z):
             return (x, y, z)
-    return _derive_orbital_position(node)
+
+    surface = _surface_position(node, at_timestamp=at_timestamp)
+    if surface is not None:
+        return surface
+
+    return _derive_orbital_position(node, at_timestamp=at_timestamp)
 
 
 def _infer_body_name(node: dict[str, Any], position: tuple[float, float, float]) -> str:
@@ -186,20 +243,12 @@ def _has_clear_line_of_sight(
     return True
 
 
-def _is_satellite_like(node: dict[str, Any]) -> bool:
-    node_type = str(node.get("node_type") or "").strip().lower()
-    return node_type in {"satellite", "relay"}
-
-
-def _satellite_link_cone_allows(
+def _endpoint_cone_allows(
     source_node: dict[str, Any],
     source_pos: tuple[float, float, float],
     dest_node: dict[str, Any],
     dest_pos: tuple[float, float, float],
 ) -> bool:
-    if not (_is_satellite_like(source_node) and _is_satellite_like(dest_node)):
-        return True
-
     source_body = _infer_body_name(source_node, source_pos)
     dest_body = _infer_body_name(dest_node, dest_pos)
     source_center = MOON_CENTER if source_body == "moon" else EARTH_CENTER
@@ -215,30 +264,59 @@ def _satellite_link_cone_allows(
     if source_to_dest is None or dest_to_source is None:
         return False
 
-    source_ok = _vec_dot(source_axis, source_to_dest) >= SATELLITE_CONE_MIN_DOT
-    dest_ok = _vec_dot(dest_axis, dest_to_source) >= SATELLITE_CONE_MIN_DOT
+    source_type = str(source_node.get("node_type") or "").strip().lower()
+    dest_type = str(dest_node.get("node_type") or "").strip().lower()
+
+    source_min_dot = GROUND_STATION_MIN_DOT if source_type == "ground_station" else SATELLITE_CONE_MIN_DOT
+    dest_min_dot = GROUND_STATION_MIN_DOT if dest_type == "ground_station" else SATELLITE_CONE_MIN_DOT
+
+    source_ok = _vec_dot(source_axis, source_to_dest) >= source_min_dot
+    dest_ok = _vec_dot(dest_axis, dest_to_source) >= dest_min_dot
     return source_ok and dest_ok
+
+
+def _is_satellite_or_relay(node: dict[str, Any] | None) -> bool:
+    if not isinstance(node, dict):
+        return False
+    node_type = str(node.get("node_type") or "").strip().lower()
+    return node_type in {"satellite", "relay"}
 
 
 def _is_link_geometry_allowed(
     source_node: dict[str, Any] | None,
     dest_node: dict[str, Any] | None,
+    at_timestamp: float | None = None,
 ) -> bool:
     # If topology node metadata is missing, fall back to contact-window-only routing.
     if not source_node or not dest_node:
         return True
 
-    source_pos = _extract_position(source_node)
-    dest_pos = _extract_position(dest_node)
+    source_pos = _extract_position(source_node, at_timestamp=at_timestamp)
+    dest_pos = _extract_position(dest_node, at_timestamp=at_timestamp)
     if source_pos is None or dest_pos is None:
         return True
 
     if not _has_clear_line_of_sight(source_pos, dest_pos):
         return False
 
-    return _satellite_link_cone_allows(source_node, source_pos, dest_node, dest_pos)
+    return _endpoint_cone_allows(source_node, source_pos, dest_node, dest_pos)
 
 class CGREngine:
+    @staticmethod
+    def is_link_hardware_allowed(
+        source_node: dict[str, Any] | None,
+        dest_node: dict[str, Any] | None,
+        at: datetime | float | None = None,
+    ) -> bool:
+        ts: float | None
+        if isinstance(at, datetime):
+            ts = at.timestamp()
+        elif isinstance(at, (int, float)):
+            ts = float(at)
+        else:
+            ts = datetime.now(timezone.utc).timestamp()
+        return _is_link_geometry_allowed(source_node, dest_node, at_timestamp=ts)
+
     @staticmethod
     def compute_route_hops(
         source_node: str,
@@ -260,34 +338,51 @@ class CGREngine:
                 plan_by_source[src] = []
             plan_by_source[src].append(contact)
 
-        earliest_arrival = {source_node: current_time_ts}
-        priority_queue = [(current_time_ts, source_node, [])]
+        earliest_arrival: dict[tuple[str, bool], float] = {(source_node, False): current_time_ts}
+        priority_queue = [(current_time_ts, source_node, [], False)]
         nodes_by_id = {
             item.get("node_id"): item
             for item in (nodes or [])
             if isinstance(item.get("node_id"), str)
         }
+        require_satellite_hop = bool(nodes_by_id)
 
         while priority_queue:
-            arrival_time, current_node, path = heapq.heappop(priority_queue)
+            arrival_time, current_node, path, has_intermediate_satellite_hop = heapq.heappop(priority_queue)
 
             if len(path) >= hop_limit or arrival_time > deadline:
                 continue
 
-            if arrival_time > earliest_arrival.get(current_node, float('inf')):
+            state_key = (current_node, has_intermediate_satellite_hop)
+            if arrival_time > earliest_arrival.get(state_key, float('inf')):
                 continue
             
             if current_node == destination_node:
+                if require_satellite_hop and not has_intermediate_satellite_hop:
+                    # Require at least one intermediary satellite/relay hop (excluding destination).
+                    continue
                 return path 
             
             for link in plan_by_source.get(current_node, []):
                 dest_node = link["dest"]
 
-                if nodes_by_id and not _is_link_geometry_allowed(nodes_by_id.get(current_node), nodes_by_id.get(dest_node)):
+                if nodes_by_id and not _is_link_geometry_allowed(
+                    nodes_by_id.get(current_node),
+                    nodes_by_id.get(dest_node),
+                    at_timestamp=arrival_time,
+                ):
                     continue
                 
                 if dest_node in path:
                     continue # Unikamy pętli
+
+                dest_is_intermediate_satellite = (
+                    dest_node != destination_node
+                    and _is_satellite_or_relay(nodes_by_id.get(dest_node))
+                )
+                next_has_intermediate_satellite_hop = (
+                    has_intermediate_satellite_hop or dest_is_intermediate_satellite
+                )
                 
                 bandwidth = link.get("bandwidth_bps", 1)
                 
@@ -303,10 +398,14 @@ class CGREngine:
                     prop_delay, trans_delay = calculate_link_delays(packet_size_bytes, bandwidth, range_km)
                     end_rx_time = start_tx_time + trans_delay + prop_delay
                     
-                    if start_tx_time + trans_delay + prop_delay <= window_end:
+                    if end_rx_time <= window_end:
                         
-                        if end_rx_time < earliest_arrival.get(dest_node, float('inf')):
-                            earliest_arrival[dest_node] = end_rx_time
-                            heapq.heappush(priority_queue, (end_rx_time, dest_node, path + [dest_node]))
+                        next_key = (dest_node, next_has_intermediate_satellite_hop)
+                        if end_rx_time < earliest_arrival.get(next_key, float('inf')):
+                            earliest_arrival[next_key] = end_rx_time
+                            heapq.heappush(
+                                priority_queue,
+                                (end_rx_time, dest_node, path + [dest_node], next_has_intermediate_satellite_hop),
+                            )
 
         return None 

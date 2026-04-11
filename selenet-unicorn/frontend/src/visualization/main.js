@@ -18,6 +18,7 @@ const satelliteName = root.querySelector("[data-satellite-name]");
 const satelliteMeta = root.querySelector("[data-satellite-meta]");
 const satelliteDescription = root.querySelector("[data-satellite-description]");
 const satelliteHint = root.querySelector("[data-satellite-hint]");
+const simulationTime = root.querySelector("[data-simulation-time]");
 const mqttTopic = root.querySelector("[data-mqtt-topic]");
 const mqttRoute = root.querySelector("[data-mqtt-route]");
 const mqttPayload = root.querySelector("[data-mqtt-payload]");
@@ -50,7 +51,180 @@ const getPacketText = (packet) => {
   }
 };
 
-const ACTIVE_ROUTE_STATUSES = new Set(["IN_TRANSIT"]);
+const parseUtcTimestampMs = (value) => {
+  if (typeof value !== "string" || value.length === 0) {
+    return null;
+  }
+  const parsed = Date.parse(value);
+  return Number.isFinite(parsed) ? parsed : null;
+};
+
+const parseFiniteNumber = (value) => {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value;
+  }
+  if (typeof value === "string" && value.trim().length > 0) {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+  return null;
+};
+
+const resolveBackendSimulationNowMs = (packet) => {
+  if (!packet || typeof packet !== "object") {
+    return null;
+  }
+
+  const earthTimestampMs = parseUtcTimestampMs(packet.earth_timestamp);
+  const realAnchorMs = parseUtcTimestampMs(packet.simulation_real_anchor);
+  const acceleration = parseFiniteNumber(packet.simulation_acceleration);
+
+  if (
+    earthTimestampMs === null
+    || realAnchorMs === null
+    || acceleration === null
+    || acceleration <= 0
+  ) {
+    return null;
+  }
+
+  const elapsedRealMs = Math.max(0, Date.now() - realAnchorMs);
+  return earthTimestampMs + (elapsedRealMs * acceleration);
+};
+
+const collectTimelineFromWindows = (windows) => {
+  if (!Array.isArray(windows) || windows.length === 0) {
+    return null;
+  }
+
+  let minStart = Number.POSITIVE_INFINITY;
+  let maxEnd = Number.NEGATIVE_INFINITY;
+  let count = 0;
+
+  windows.forEach((windowItem) => {
+    if (!windowItem || typeof windowItem !== "object") {
+      return;
+    }
+    const startMs = parseUtcTimestampMs(windowItem.start);
+    const endMs = parseUtcTimestampMs(windowItem.end);
+    if (startMs === null || endMs === null || endMs <= startMs) {
+      return;
+    }
+    minStart = Math.min(minStart, startMs);
+    maxEnd = Math.max(maxEnd, endMs);
+    count += 1;
+  });
+
+  if (!Number.isFinite(minStart) || !Number.isFinite(maxEnd) || count === 0) {
+    return null;
+  }
+
+  return {
+    startMs: minStart,
+    endMs: maxEnd,
+    spanMs: Math.max(1000, maxEnd - minStart),
+    count,
+  };
+};
+
+const getPairWindows = (nodeById, sourceId, destId) => {
+  const source = nodeById.get(sourceId);
+  if (!source || !Array.isArray(source.links)) {
+    return [];
+  }
+
+  const link = source.links.find((item) => {
+    if (typeof item === "string") {
+      return item === destId;
+    }
+    if (!item || typeof item !== "object") {
+      return false;
+    }
+    return item.dest_node === destId;
+  });
+
+  if (!link || typeof link === "string") {
+    return [];
+  }
+
+  return Array.isArray(link.windows) ? link.windows : [];
+};
+
+const resolveSimulationTimeline = () => {
+  const snapshot = getTelemetrySnapshot();
+  const nodes = Array.isArray(snapshot?.nodes) ? snapshot.nodes : [];
+  if (nodes.length === 0) {
+    return null;
+  }
+
+  const nodeById = new Map(
+    nodes
+      .filter((node) => node && typeof node.node_id === "string")
+      .map((node) => [node.node_id, node])
+  );
+
+  const livePacket = getLivePacket();
+  const routeIds = livePacket ? buildRouteNodeIds(livePacket) : [];
+  const routePairs = [];
+  for (let i = 0; i < routeIds.length - 1; i += 1) {
+    routePairs.push([routeIds[i], routeIds[i + 1]]);
+  }
+
+  if (routePairs.length > 0) {
+    const routeWindows = routePairs.flatMap(([src, dst]) => getPairWindows(nodeById, src, dst));
+    const routeTimeline = collectTimelineFromWindows(routeWindows);
+    if (routeTimeline) {
+      return routeTimeline;
+    }
+  }
+
+  const pingPairs = [
+    ["EARTH_GATEWAY", "SAT_1"],
+    ["SAT_1", "LUNAR_GATEWAY"],
+  ];
+  const pingWindows = pingPairs.flatMap(([src, dst]) => getPairWindows(nodeById, src, dst));
+  const pingTimeline = collectTimelineFromWindows(pingWindows);
+  if (pingTimeline) {
+    return pingTimeline;
+  }
+
+  const allWindows = [];
+  nodes.forEach((node) => {
+    if (!node || !Array.isArray(node.links)) {
+      return;
+    }
+    node.links.forEach((link) => {
+      if (!link || typeof link !== "object") {
+        return;
+      }
+      if (Array.isArray(link.windows)) {
+        allWindows.push(...link.windows);
+      }
+    });
+  });
+  return collectTimelineFromWindows(allWindows);
+};
+
+const simulationClockFormatter = new Intl.DateTimeFormat("pl-PL", {
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+  hour: "2-digit",
+  minute: "2-digit",
+  second: "2-digit",
+  hour12: false,
+  timeZone: "UTC",
+});
+
+const formatSimulationClock = (timestampMs) => `${simulationClockFormatter.format(new Date(timestampMs))} UTC`;
+
+// Match sidebar clock pace to accelerated planet rotation in this scene.
+const VISUAL_EARTH_ROTATION_RAD_S = 0.12;
+const REAL_EARTH_ROTATION_RAD_S = (2 * Math.PI) / 86164.0905;
+const SIMULATION_TIME_ACCELERATION = VISUAL_EARTH_ROTATION_RAD_S / REAL_EARTH_ROTATION_RAD_S;
+
+const ACTIVE_ROUTE_STATUSES = new Set(["IN_TRANSIT", "FORWARDING", "HANDLING", "QUEUED_ON_EARTH", "WAITING_RETRY"]);
+const ROUTE_VISIBLE_STATUSES = new Set(["IN_TRANSIT", "FORWARDING", "HANDLING", "QUEUED_ON_EARTH", "WAITING_RETRY", "SAVED_ON_EARTH", "HOP_COMPLETED", "DELIVERED"]);
 
 const getLivePacket = () => {
   const snapshot = getTelemetrySnapshot();
@@ -64,7 +238,19 @@ const getLivePacket = () => {
     return ACTIVE_ROUTE_STATUSES.has(status);
   });
 
-  return preferred ?? null;
+  if (preferred) {
+    return preferred;
+  }
+
+  const fallbackWithRoute = packets.find((packet) => {
+    const status = String(packet?.current_status ?? "").toUpperCase();
+    if (!ROUTE_VISIBLE_STATUSES.has(status)) {
+      return false;
+    }
+    return Array.isArray(packet?.route_hops) && packet.route_hops.length > 0;
+  });
+
+  return fallbackWithRoute ?? null;
 };
 
 const scene = new THREE.Scene();
@@ -261,7 +447,7 @@ const relayBeams = [];
 const topologyMaterial = new THREE.LineBasicMaterial({ color: 0x4a7e99, transparent: true, opacity: 0.15, blending: THREE.AdditiveBlending });
 const topologyGeometry = new THREE.BufferGeometry();
 const topologyLines = new THREE.LineSegments(topologyGeometry, topologyMaterial);
-topologyLines.visible = false;
+topologyLines.visible = true;
 scene.add(topologyLines);
 
 const earthRelayIds = [];
@@ -277,6 +463,8 @@ const bodies = [
   { id: "earth", getCenter: () => earthGroup.getWorldPosition(new THREE.Vector3()), radius: EARTH_RADIUS },
   { id: "moon", getCenter: () => moonGroup.getWorldPosition(new THREE.Vector3()), radius: MOON_RADIUS },
 ];
+const ROUTE_CONE_HALF_ANGLE_DEG = 30;
+const ROUTE_CONE_MIN_DOT = Math.cos(THREE.MathUtils.degToRad(ROUTE_CONE_HALF_ANGLE_DEG));
 
 function getOrbitalAngularSpeed(radius, system, direction = 1) {
   const baseSpeed = system === "earth" ? 1.05 : 0.82;
@@ -403,6 +591,10 @@ function createBase(parent, options) {
   mast.position.y = 0.16;
   base.add(mast);
 
+  const antennaEmitter = new THREE.Object3D();
+  antennaEmitter.position.set(0, 0.25, 0);
+  base.add(antennaEmitter);
+
   const hitTarget = new THREE.Mesh(
     new THREE.SphereGeometry(0.3, 16, 16),
     new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false })
@@ -425,7 +617,7 @@ function createBase(parent, options) {
     ...data,
     kind: "base",
     bodyId: options.bodyId,
-    getWorldPosition: () => base.getWorldPosition(new THREE.Vector3()),
+    getWorldPosition: () => antennaEmitter.getWorldPosition(new THREE.Vector3()),
   });
 
   return { mesh: base, hitTarget, data, selectableEntry };
@@ -546,24 +738,23 @@ function createRelayBeam(color) {
     new THREE.TubeGeometry(
       new THREE.CatmullRomCurve3([new THREE.Vector3(), new THREE.Vector3(0.001, 0, 0)]),
       12,
-      0.045,
+      0.18,
       10,
       false
     ),
     new THREE.MeshBasicMaterial({
       color,
-      transparent: true,
-      opacity: 0.92,
-      blending: THREE.AdditiveBlending,
-      depthWrite: false,
+      transparent: false,
+      opacity: 1.0,
+      depthWrite: true,
     })
   );
   tube.visible = false;
   scene.add(tube);
 
   const marker = new THREE.Mesh(
-    new THREE.SphereGeometry(0.06, 16, 16),
-    new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.84 })
+    new THREE.SphereGeometry(0.35, 16, 16),
+    new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.95 })
   );
   scene.add(marker);
 
@@ -861,8 +1052,14 @@ function createLiveBaseConfig(node, activeLoad, elapsed = 0) {
   const placement = computeNodePlacement(node, network, elapsed);
   const normal = [placement.normal.x, placement.normal.y, placement.normal.z];
 
-  const linkInfo = Array.isArray(node.links) && node.links.length > 0
-    ? `Polaczenia: ${node.links.join(", ")}`
+  const baseLinkTargets = Array.isArray(node.links)
+    ? node.links
+        .map((link) => (typeof link === "object" ? link.dest_node : link))
+        .filter(Boolean)
+    : [];
+
+  const linkInfo = baseLinkTargets.length > 0
+    ? `Polaczenia: ${baseLinkTargets.join(", ")}`
     : "Brak aktywnych linkow.";
 
   const isMoon = network === "moon";
@@ -1100,6 +1297,47 @@ function hasLineOfSight(fromNode, toNode) {
   });
 }
 
+function resolveBodyForNode(node, position) {
+  const byId = bodies.find((body) => body.id === node?.bodyId);
+  if (byId) {
+    return byId;
+  }
+
+  let closest = bodies[0];
+  let minDist = Number.POSITIVE_INFINITY;
+  bodies.forEach((body) => {
+    const dist = position.distanceTo(body.center);
+    if (dist < minDist) {
+      minDist = dist;
+      closest = body;
+    }
+  });
+  return closest;
+}
+
+function endpointConeAllows(fromNode, toNode) {
+  const from = fromNode.getWorldPosition();
+  const to = toNode.getWorldPosition();
+  const dir = to.clone().sub(from);
+  const rev = from.clone().sub(to);
+  if (dir.lengthSq() < 1e-9 || rev.lengthSq() < 1e-9) {
+    return false;
+  }
+  dir.normalize();
+  rev.normalize();
+
+  bodies.forEach((body) => {
+    body.center = body.getCenter();
+  });
+
+  const fromBody = resolveBodyForNode(fromNode, from);
+  const toBody = resolveBodyForNode(toNode, to);
+  const fromAxis = from.clone().sub(fromBody.center).normalize();
+  const toAxis = to.clone().sub(toBody.center).normalize();
+
+  return fromAxis.dot(dir) >= ROUTE_CONE_MIN_DOT && toAxis.dot(rev) >= ROUTE_CONE_MIN_DOT;
+}
+
 function findBlockingBody(fromNode, toNode) {
   const from = fromNode.getWorldPosition();
   const to = toNode.getWorldPosition();
@@ -1128,44 +1366,40 @@ function findBlockingBody(fromNode, toNode) {
   return selected;
 }
 
+function slerpDirection(startDir, endDir, t, fallbackAxis) {
+  const start = startDir.clone().normalize();
+  const end = endDir.clone().normalize();
+  const dot = THREE.MathUtils.clamp(start.dot(end), -1, 1);
+
+  if (dot > 0.9995) {
+    return start.lerp(end, t).normalize();
+  }
+
+  if (dot < -0.9995) {
+    const axis = fallbackAxis.clone().normalize();
+    return start.applyAxisAngle(axis, Math.PI * t).normalize();
+  }
+
+  const theta = Math.acos(dot);
+  const sinTheta = Math.sin(theta);
+  const wStart = Math.sin((1 - t) * theta) / sinTheta;
+  const wEnd = Math.sin(t * theta) / sinTheta;
+
+  return start.multiplyScalar(wStart).add(end.multiplyScalar(wEnd)).normalize();
+}
+
 function buildRelayPathPoints(fromNode, toNode) {
-  const from = fromNode.getWorldPosition();
-  const to = toNode.getWorldPosition();
+  if (!fromNode?.mesh || !toNode?.mesh) {
+    return null;
+  }
+  const from = fromNode.mesh.getWorldPosition(new THREE.Vector3());
+  const to = toNode.mesh.getWorldPosition(new THREE.Vector3());
 
-  if (hasLineOfSight(fromNode, toNode)) {
-    return [from, to];
+  if (!Number.isFinite(from.lengthSq()) || !Number.isFinite(to.lengthSq())) {
+    return null;
   }
 
-  const blockingBody = findBlockingBody(fromNode, toNode);
-  if (!blockingBody) {
-    return [from, to];
-  }
-
-  const center = blockingBody.center;
-  const fromDir = from.clone().sub(center).normalize();
-  const toDir = to.clone().sub(center).normalize();
-
-  let aroundAxis = fromDir.clone().cross(toDir);
-  if (aroundAxis.lengthSq() < 1e-8) {
-    aroundAxis = fromDir.clone().cross(new THREE.Vector3(0, 1, 0));
-  }
-  if (aroundAxis.lengthSq() < 1e-8) {
-    aroundAxis = fromDir.clone().cross(new THREE.Vector3(0, 0, 1));
-  }
-  aroundAxis.normalize();
-
-  const detourRadius = blockingBody.radius + 0.95;
-  const control1 = center
-    .clone()
-    .add(fromDir.clone().multiplyScalar(detourRadius))
-    .add(aroundAxis.clone().multiplyScalar(detourRadius * 0.42));
-  const control2 = center
-    .clone()
-    .add(toDir.clone().multiplyScalar(detourRadius))
-    .add(aroundAxis.clone().multiplyScalar(detourRadius * 0.42));
-
-  const curve = new THREE.CubicBezierCurve3(from, control1, control2, to);
-  return curve.getPoints(28);
+  return [from, to];
 }
 
 function samplePolylinePoint(points, t) {
@@ -1212,18 +1446,14 @@ function createDynamicRoute(elapsed = 0) {
     const missingNodes = routeIds.length - routeNodes.length;
     const suffix = missingNodes > 0 ? ` | brak wizualizacji dla ${missingNodes} node` : "";
 
-    const isActive = livePacket.current_status === "IN_TRANSIT";
-    const activeHopNodes = isActive
-      ? [
-          livePacket.current_node_id,
-          livePacket.current_node,
-          livePacket.currentNodeId,
-          livePacket.from_node,
-          livePacket.next_hop,
-          livePacket.nextHop,
-          livePacket.to_node,
-        ]
-      : [];
+    const currentStatus = String(livePacket.current_status ?? "").toUpperCase();
+    const isActive = ACTIVE_ROUTE_STATUSES.has(currentStatus);
+    const activeHopFrom = isActive
+      ? (livePacket.from_node ?? livePacket.current_node_id ?? livePacket.source_node ?? null)
+      : null;
+    const activeHopTo = isActive
+      ? (livePacket.to_node ?? livePacket.next_hop ?? livePacket.destination_node ?? null)
+      : null;
 
     return {
       nodes: routeNodes,
@@ -1232,7 +1462,10 @@ function createDynamicRoute(elapsed = 0) {
       topic: `api/packets/${livePacket.packet_id}`,
       qos: livePacket.priority === 1 ? 2 : 1,
       status: `status: ${livePacket.current_status ?? "UNKNOWN"}${suffix}`,
-      activeHopNodes: activeHopNodes.filter(Boolean)
+      isActive,
+      activeHopFrom,
+      activeHopTo,
+      currentHopIndex: Number(livePacket.current_hop_index ?? 0),
     };
   }
 
@@ -1608,7 +1841,10 @@ legacySatelliteEntries.forEach((entry) => {
 
 syncLiveNodes();
 
-["#59d8ff", "#7eb6ff", "#ff8eb8", "#ffe28b", "#8ef3ff"].forEach((color) => createRelayBeam(color));
+  ["#59d8ff", "#7eb6ff", "#ff8eb8", "#ffe28b", "#8ef3ff", "#ff5959", "#59ff6a", "#c859ff", "#ffffff"].forEach((color) => {
+    createRelayBeam(color);
+    createRelayBeam(color);
+  });
 const starsGeometry = new THREE.BufferGeometry();
 const starCount = 6500;
 const starVertices = new Float32Array(starCount * 3);
@@ -1691,6 +1927,55 @@ let simulatedElapsed = 0;
 let simulationSlow = false;
 let routeSequenceKey = "idle";
 let routeSequenceStart = 0;
+let simulationTimelineStartMs = null;
+let simulationTimelineSpanMs = null;
+let simulationTimelineSignature = "";
+let simulationClockRenderedSecond = -1;
+
+function updateSimulationClock(elapsedSeconds) {
+  if (!simulationTime) {
+    return;
+  }
+
+  const backendClockMs = resolveBackendSimulationNowMs(getLivePacket());
+  if (backendClockMs !== null) {
+    const simulationNowSecond = Math.floor(backendClockMs / 1000);
+    if (simulationNowSecond === simulationClockRenderedSecond) {
+      return;
+    }
+    simulationClockRenderedSecond = simulationNowSecond;
+    simulationTime.textContent = `Czas symulacji (backend, UTC): ${formatSimulationClock(backendClockMs)}`;
+    return;
+  }
+
+  const timeline = resolveSimulationTimeline();
+  if (timeline) {
+    const signature = `${timeline.startMs}|${timeline.endMs}|${timeline.count}`;
+    if (signature !== simulationTimelineSignature) {
+      simulationTimelineSignature = signature;
+      simulationTimelineStartMs = timeline.startMs;
+      simulationTimelineSpanMs = timeline.spanMs;
+      simulationClockRenderedSecond = -1;
+    }
+  } else if (simulationTimelineSignature !== "") {
+    simulationTimelineSignature = "";
+    simulationTimelineStartMs = null;
+    simulationTimelineSpanMs = null;
+    simulationClockRenderedSecond = -1;
+  }
+
+  const simulationNowMs =
+    simulationTimelineStartMs !== null && simulationTimelineSpanMs !== null
+      ? simulationTimelineStartMs + ((elapsedSeconds * 1000 * SIMULATION_TIME_ACCELERATION) % simulationTimelineSpanMs)
+      : Date.now();
+  const simulationNowSecond = Math.floor(simulationNowMs / 1000);
+  if (simulationNowSecond === simulationClockRenderedSecond) {
+    return;
+  }
+
+  simulationClockRenderedSecond = simulationNowSecond;
+  simulationTime.textContent = `Czas symulacji (okna, UTC): ${formatSimulationClock(simulationNowMs)}`;
+}
 
 function animate() {
   timer.update();
@@ -1698,6 +1983,8 @@ function animate() {
   
   simulatedElapsed += simulationSlow ? delta * 0.12 : delta;
   const elapsed = simulatedElapsed;
+  updateSimulationClock(elapsed);
+  syncLiveNodes(elapsed);
 
   earthSurfaceGroup.rotation.y = elapsed * 0.12;
   cloudLayer.rotation.y = elapsed * 0.04;
@@ -1812,7 +2099,7 @@ function animate() {
     if (!vPos) return;
 
     node.links.forEach(link => {
-       const dest_node = typeof link === "object" ? link.dest_node : link;
+       const dest_node = typeof link === "object" ? (link.dest_node || link.destination) : link;
        if (!dest_node) return;
        const pairId = [node.node_id, dest_node].sort().join("-");
        if (processedLinks.has(pairId)) return;
@@ -1825,11 +2112,23 @@ function animate() {
     });
   });
 
-  topologyGeometry.setAttribute('position', new THREE.Float32BufferAttribute(topologyPositions, 3));
-
+  try {
+    if (topologyPositions.length > 0) {
+      topologyGeometry.setAttribute('position', new THREE.Float32BufferAttribute(topologyPositions, 3));
+      topologyGeometry.computeBoundingSphere();
+      topologyLines.visible = true;
+    } else {
+      topologyLines.visible = false;
+    }
+  } catch (e) {
+    console.warn("Topology render failed", e);
+    if (topologyLines) topologyLines.visible = false;
+  }
 
   const route = createDynamicRoute(elapsed);
-  const sequenceKey = route?.topic ?? "idle";
+  const sequenceKey = route
+    ? `${route.topic}|${route.isActive ? "active" : "static"}|${route.activeHopFrom ?? "-"}|${route.activeHopTo ?? "-"}`
+    : "idle";
   if (sequenceKey !== routeSequenceKey) {
     routeSequenceKey = sequenceKey;
     routeSequenceStart = elapsed;
@@ -1849,6 +2148,7 @@ function animate() {
   const hopTravelSeconds = 1.05;
   const hopGapSeconds = 0.25;
   const hopStepSeconds = hopTravelSeconds + hopGapSeconds;
+  const routeIsActive = Boolean(route?.isActive);
 
   routeNodes.slice(0, -1).forEach((node, index) => {
     const nextNode = routeNodes[index + 1];
@@ -1856,49 +2156,92 @@ function animate() {
       return;
     }
     const beamPoints = buildRelayPathPoints(node, nextNode);
+    if (!beamPoints || beamPoints.length < 2) {
+      return;
+    }
     fromPosition.copy(beamPoints[0]);
     toPosition.copy(beamPoints[beamPoints.length - 1]);
     if (!Number.isFinite(fromPosition.lengthSq()) || !Number.isFinite(toPosition.lengthSq())) {
       return;
     }
-    const hasExplicitActiveHop = Array.isArray(route.activeHopNodes) && route.activeHopNodes.length >= 2;
-    const isActiveHop = hasExplicitActiveHop
-      ? route.activeHopNodes.includes(node.id) && route.activeHopNodes.includes(nextNode.id)
-      : true;
-
-    const hopStart = index * hopStepSeconds;
-    const hopProgress = (sequenceElapsed - hopStart) / hopTravelSeconds;
-
-    if (!isActiveHop || hopProgress < 0) {
-      return;
-    }
-
-    const hopFinished = hopProgress >= 1;
-    const hopProgressClamped = THREE.MathUtils.clamp(hopProgress, 0, 1);
 
     relayBeams[index].currentNodes = [node, nextNode];
     relayBeams[index].line.visible = true;
-    relayBeams[index].marker.visible = !hopFinished;
     relayBeams[index].line.geometry.setFromPoints(beamPoints);
     if (relayBeams[index].tube) {
       relayBeams[index].tube.geometry.dispose();
       relayBeams[index].tube.geometry = new THREE.TubeGeometry(
         new THREE.CatmullRomCurve3(beamPoints),
-        Math.max(12, beamPoints.length * 4),
-        0.075,
-        10,
+        Math.max(16, beamPoints.length * 4),
+        0.45,  // Promień rury (grubość)
+        12,    // Segmenty promienia
         false
       );
       relayBeams[index].tube.visible = true;
     }
-    if (!hopFinished) {
-      markerPosition.copy(samplePolylinePoint(beamPoints, hopProgressClamped));
-      relayBeams[index].marker.position.copy(markerPosition);
+
+    if (!routeIsActive) {
+      relayBeams[index].marker.visible = false;
+      relayBeams[index].line.material.opacity = 0.5;
+      if (relayBeams[index].tube) {
+        relayBeams[index].tube.material.opacity = 0.68;
+      }
+      return;
     }
+
+    const isActiveHop =
+      typeof route.activeHopFrom === "string" &&
+      typeof route.activeHopTo === "string" &&
+      node.id === route.activeHopFrom &&
+      nextNode.id === route.activeHopTo;
+
+    const isActuallyLive = route.isActive && isActiveHop;
+
+    let hopProgress;
+    if (isActuallyLive) {
+      // High-priority live animation: start from 0 immediately when this hop becomes active
+      hopProgress = sequenceElapsed / hopTravelSeconds;
+    } else {
+      // Background/static animation: playback from the beginning of the route
+      const hopStart = index * hopStepSeconds;
+      hopProgress = (sequenceElapsed - hopStart) / hopTravelSeconds;
+    }
+
+    if (!isActiveHop) {
+      relayBeams[index].marker.visible = false;
+      relayBeams[index].line.material.opacity = 0.24;
+      if (relayBeams[index].tube) {
+        relayBeams[index].tube.material.opacity = 0.36;
+      }
+      return;
+    }
+
+    if (hopProgress < 0 && !isActuallyLive) {
+      relayBeams[index].marker.visible = false;
+      relayBeams[index].line.material.opacity = 0.24;
+      if (relayBeams[index].tube) {
+        relayBeams[index].tube.material.opacity = 0.36;
+      }
+      return;
+    }
+
+    const hopProgressClamped = THREE.MathUtils.clamp(hopProgress, 0, 1);
+    const hopFinished = hopProgress >= 1;
+    
+    // For live hops, keep marker visible even if animation duration finished, 
+    // as long as the status hasn't changed yet.
+    relayBeams[index].marker.visible = isActuallyLive || !hopFinished;
+    
+    markerPosition.copy(samplePolylinePoint(beamPoints, hopProgressClamped));
+    relayBeams[index].marker.position.copy(markerPosition);
+    const pulse = 1.0 + Math.sin(elapsed * 18) * 0.45;
+    relayBeams[index].marker.scale.setScalar(pulse);
     const transferPulse = Math.sin(hopProgressClamped * Math.PI);
-    relayBeams[index].line.material.opacity = hopFinished ? 0.58 : 0.4 + 0.55 * transferPulse;
+    const flicker = 0.95 + Math.random() * 0.05;
+    // Force high visibility for active routes
+    relayBeams[index].line.material.opacity = 0.9;
     if (relayBeams[index].tube) {
-      relayBeams[index].tube.material.opacity = hopFinished ? 0.72 : 0.55 + 0.4 * transferPulse;
+      relayBeams[index].tube.material.opacity = 1.0;
     }
   });
 

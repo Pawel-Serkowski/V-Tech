@@ -55,7 +55,7 @@ async function request(path, options = {}) {
   return parseResponse(response);
 }
 
-export function fetchPackets(limit = 300) {
+export function fetchPackets(limit = 1000) {
   return request(`/api/packets?limit=${limit}`);
 }
 
@@ -104,5 +104,10 @@ export function uploadNodesFile(file, options = {}) {
   return request(`/api/nodes/upload-file${query}`, {
     method: "POST",
     body: formData,
+  });
+}
+export function deletePackets() {
+  return request("/api/packets", {
+    method: "DELETE",
   });
 }
