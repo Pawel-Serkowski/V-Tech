@@ -1,0 +1,108 @@
+name: selenet-unicorn
+
+services:
+  backend:
+    build:
+      context: ./selenet-backend
+      dockerfile: Dockerfile
+      target: backend
+    container_name: selenet-backend-v2
+    environment:
+      MONGO_URL: mongodb://mongo:27017
+      MONGO_DB: selenet
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
+      PACKET_QUEUE_PREFIX: packets
+      RABBITMQ_MAX_PRIORITY: 10
+      STATUS_EXCHANGE_NAME: status.updates
+      DISPATCH_ORIGIN_SCOPE: earth
+      DISPATCH_ORIGIN_NODE_ID: ""
+      DISPATCH_ALLOWED_SOURCE_NODE_IDS: ""
+      SERVICE_LOCATION: Earth Mission Control
+      CORS_ORIGINS: "*"
+    ports:
+      - "8002:8000"
+    depends_on:
+      - rabbitmq
+      - mongo
+    restart: on-failure
+
+  worker_earth_gateway:
+    build:
+      context: ./selenet-backend
+      dockerfile: Dockerfile
+      target: worker
+    container_name: selenet-worker-v2-earth-gateway
+    environment:
+      NODE_ID: EARTH_GATEWAY
+      NODE_LOCATION: Earth Mission Control
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
+      PACKET_QUEUE_PREFIX: packets
+      BACKEND_BASE_URL: http://backend:8000
+      RABBITMQ_MAX_PRIORITY: 10
+      RETRY_REQUEUE_SECONDS: 2
+      SIMULATION_TIME_SCALE: 1.0
+    depends_on:
+      - backend
+      - rabbitmq
+    restart: on-failure
+
+  worker_sat_1:
+    build:
+      context: ./selenet-backend
+      dockerfile: Dockerfile
+      target: worker
+    container_name: selenet-worker-v2-sat-1
+    environment:
+      NODE_ID: SAT_1
+      NODE_LOCATION: Earth-Moon Transfer Orbit
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
+      PACKET_QUEUE_PREFIX: packets
+      BACKEND_BASE_URL: http://backend:8000
+      RABBITMQ_MAX_PRIORITY: 10
+      RETRY_REQUEUE_SECONDS: 2
+      SIMULATION_TIME_SCALE: 1.0
+    depends_on:
+      - backend
+      - rabbitmq
+    restart: on-failure
+
+  worker_lunar_gateway:
+    build:
+      context: ./selenet-backend
+      dockerfile: Dockerfile
+      target: worker
+    container_name: selenet-worker-v2-lunar-gateway
+    environment:
+      NODE_ID: LUNAR_GATEWAY
+      NODE_LOCATION: Lunar Gateway
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
+      PACKET_QUEUE_PREFIX: packets
+      BACKEND_BASE_URL: http://backend:8000
+      RABBITMQ_MAX_PRIORITY: 10
+      RETRY_REQUEUE_SECONDS: 2
+      SIMULATION_TIME_SCALE: 1.0
+    depends_on:
+      - backend
+      - rabbitmq
+    restart: on-failure
+
+  rabbitmq:
+    image: rabbitmq:3.13-management
+    container_name: selenet-rabbitmq-v2
+    ports:
+      - "5673:5672"
+      - "15673:15672"
+    volumes:
+      - rabbitmq_data_v2:/var/lib/rabbitmq
+
+  mongo:
+    image: mongo:7
+    container_name: selenet-mongo-v2
+    ports:
+      - "27018:27017"
+    volumes:
+      - mongo_data_v2:/data/db
+
+volumes:
+  rabbitmq_data_v2:
+  mongo_data_v2:
