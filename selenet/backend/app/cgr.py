@@ -1,9 +1,47 @@
 from datetime import datetime, timezone
 import heapq
+import math
 from typing import Any
 
 
-def calculate_delay(source_node: dict[str, Any], destination_node_id: str) -> float:
+SPEED_OF_LIGHT_KM_S = 299792.458
+
+
+def _extract_cartesian_position(node: dict[str, Any]) -> tuple[float, float, float] | None:
+    x = node.get("position_x_km")
+    y = node.get("position_y_km")
+    z = node.get("position_z_km")
+
+    if x is None or y is None or z is None:
+        return None
+
+    try:
+        return (float(x), float(y), float(z))
+    except (TypeError, ValueError):
+        return None
+
+
+def calculate_distance(source_node: dict[str, Any], destination_node: dict[str, Any]) -> float | None:
+    source_position = _extract_cartesian_position(source_node)
+    destination_position = _extract_cartesian_position(destination_node)
+
+    if not source_position or not destination_position:
+        return None
+
+    return math.dist(source_position, destination_position)
+
+
+def calculate_delay(
+    source_node: dict[str, Any],
+    destination_node_id: str,
+    node_map: dict[str, dict[str, Any]],
+) -> float:
+    destination_node = node_map.get(destination_node_id)
+    if destination_node is not None:
+        distance_km = calculate_distance(source_node, destination_node)
+        if distance_km is not None:
+            return distance_km / SPEED_OF_LIGHT_KM_S
+
     source_type = source_node.get("node_type")
     if source_type == "ground_station":
         return 0.5
@@ -28,7 +66,7 @@ def _build_contacts_for_nodes(nodes, current_time, node_map):
                     "dest": neighbor,
                     "start": start,
                     "end": end,
-                    "delay": calculate_delay(node, neighbor)
+                    "delay": calculate_delay(node, neighbor, node_map)
                 })
     
     contact_plan.sort(key=lambda x: x["start"])
