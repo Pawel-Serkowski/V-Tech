@@ -15,6 +15,7 @@ import {
   WS_STATUS_URL,
   cancelPacket,
   createPacket,
+  fetchDispatchContext,
   fetchNodes,
   fetchPackets,
   fetchQueueLoad,
@@ -35,10 +36,12 @@ export default function App() {
   const [packets, setPackets] = useState([]);
   const [queueLoad, setQueueLoad] = useState([]);
   const [nodes, setNodes] = useState([]);
+  const [dispatchContext, setDispatchContext] = useState(null);
   const [events, setEvents] = useState([]);
   const [cancellingPacketIds, setCancellingPacketIds] = useState([]);
   const [loadingPackets, setLoadingPackets] = useState(true);
   const [loadingNodes, setLoadingNodes] = useState(true);
+  const [loadingDispatchContext, setLoadingDispatchContext] = useState(true);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [streamOnline, setStreamOnline] = useState(false);
@@ -54,12 +57,17 @@ export default function App() {
     setNodes(rows);
   }, []);
 
+  const refreshDispatchContext = useCallback(async () => {
+    const context = await fetchDispatchContext();
+    setDispatchContext(context);
+  }, []);
+
   useEffect(() => {
     let active = true;
 
     async function bootstrap() {
       try {
-        await Promise.all([refreshTelemetry(), refreshNodes()]);
+        await Promise.all([refreshTelemetry(), refreshNodes(), refreshDispatchContext()]);
       } catch (err) {
         if (active) {
           setError(err.message);
@@ -68,6 +76,7 @@ export default function App() {
         if (active) {
           setLoadingPackets(false);
           setLoadingNodes(false);
+          setLoadingDispatchContext(false);
         }
       }
     }
@@ -80,7 +89,7 @@ export default function App() {
     }, 7000);
 
     const nodesIntervalId = setInterval(() => {
-      refreshNodes().catch(() => {
+      Promise.all([refreshNodes(), refreshDispatchContext()]).catch(() => {
         // Ignore transient fetch failures for node list.
       });
     }, 25000);
@@ -90,7 +99,7 @@ export default function App() {
       clearInterval(telemetryIntervalId);
       clearInterval(nodesIntervalId);
     };
-  }, [refreshNodes, refreshTelemetry]);
+  }, [refreshDispatchContext, refreshNodes, refreshTelemetry]);
 
   useEffect(() => {
     const socket = new WebSocket(WS_STATUS_URL);
@@ -151,15 +160,17 @@ export default function App() {
 
   const handleRefreshNodes = useCallback(async () => {
     setLoadingNodes(true);
+    setLoadingDispatchContext(true);
 
     try {
-      await refreshNodes();
+      await Promise.all([refreshNodes(), refreshDispatchContext()]);
     } catch (err) {
       setError(err.message);
     } finally {
       setLoadingNodes(false);
+      setLoadingDispatchContext(false);
     }
-  }, [refreshNodes]);
+  }, [refreshDispatchContext, refreshNodes]);
 
   const handleCancelPacket = useCallback(async (packetId) => {
     setError("");
@@ -283,6 +294,10 @@ export default function App() {
             element={(
               <DispatchPage
                 onDispatch={handlePacketDispatch}
+                nodes={nodes}
+                loadingNodes={loadingNodes}
+                dispatchContext={dispatchContext}
+                loadingDispatchContext={loadingDispatchContext}
                 packets={packets}
                 events={events}
                 loadingPackets={loadingPackets}

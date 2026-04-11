@@ -46,6 +46,8 @@ const getPacketText = (packet) => {
   }
 };
 
+const ACTIVE_ROUTE_STATUSES = new Set(["IN_TRANSIT"]);
+
 const getLivePacket = () => {
   const snapshot = getTelemetrySnapshot();
   const packets = Array.isArray(snapshot?.packets) ? snapshot.packets : [];
@@ -55,10 +57,10 @@ const getLivePacket = () => {
 
   const preferred = packets.find((packet) => {
     const status = String(packet?.current_status ?? "").toUpperCase();
-    return ["IN_TRANSIT", "QUEUED_ON_EARTH", "WAITING_RETRY"].includes(status);
+    return ACTIVE_ROUTE_STATUSES.has(status);
   });
 
-  return preferred ?? packets[0] ?? null;
+  return preferred ?? null;
 };
 
 const scene = new THREE.Scene();
@@ -124,12 +126,12 @@ const sunHalo = new THREE.Mesh(
 sunGroup.add(sunHalo);
 
 const textureLoader = new THREE.TextureLoader();
-const earthDayTexture = textureLoader.load("/textures/earth_day.jpg");
-const earthNormalTexture = textureLoader.load("/textures/earth_normal.jpg");
-const earthSpecularTexture = textureLoader.load("/textures/earth_specular.jpg");
-const earthCloudTexture = textureLoader.load("/textures/earth_clouds.png");
-const earthNightTexture = textureLoader.load("/textures/earth_night.png");
-const moonTexture = textureLoader.load("/textures/moon.jpg");
+const earthDayTexture = textureLoader.load("/public/textures/earth_day.jpg");
+const earthNormalTexture = textureLoader.load("/public/textures/earth_normal.jpg");
+const earthSpecularTexture = textureLoader.load("/public/textures/earth_specular.jpg");
+const earthCloudTexture = textureLoader.load("/public/textures/earth_clouds.png");
+const earthNightTexture = textureLoader.load("/public/textures/earth_night.png");
+const moonTexture = textureLoader.load("/public/textures/moon.jpg");
 
 [earthDayTexture, earthCloudTexture, earthNightTexture, moonTexture].forEach((texture) => {
   texture.colorSpace = THREE.SRGBColorSpace;
@@ -712,7 +714,7 @@ function syncLiveNodes() {
   const activeLoadByNode = new Map();
   packets.forEach((packet) => {
     const status = String(packet?.current_status ?? "").toUpperCase();
-    if (["DELIVERED", "FAILED", "ERROR", "CANCELLED"].includes(status)) {
+    if (!ACTIVE_ROUTE_STATUSES.has(status)) {
       return;
     }
     const routeIds = buildRouteNodeIds(packet);
@@ -830,6 +832,89 @@ function hasLineOfSight(fromNode, toNode) {
     }
     return closest.point.distanceTo(body.center) < body.radius + 0.02;
   });
+}
+
+function findBlockingBody(fromNode, toNode) {
+  const from = fromNode.getWorldPosition();
+  const to = toNode.getWorldPosition();
+  bodies.forEach((body) => {
+    body.center = body.getCenter();
+  });
+
+  let selected = null;
+  let minDistance = Number.POSITIVE_INFINITY;
+
+  bodies.forEach((body) => {
+    const closest = closestPointOnSegment(body.center, from, to);
+    const touchingFromBody = fromNode.bodyId === body.id && closest.t < 0.03;
+    const touchingToBody = toNode.bodyId === body.id && closest.t > 0.97;
+    if (touchingFromBody || touchingToBody) {
+      return;
+    }
+
+    const distance = closest.point.distanceTo(body.center);
+    if (distance < body.radius + 0.02 && distance < minDistance) {
+      minDistance = distance;
+      selected = body;
+    }
+  });
+
+  return selected;
+}
+
+function buildRelayPathPoints(fromNode, toNode) {
+  const from = fromNode.getWorldPosition();
+  const to = toNode.getWorldPosition();
+
+  if (hasLineOfSight(fromNode, toNode)) {
+    return [from, to];
+  }
+
+  const blockingBody = findBlockingBody(fromNode, toNode);
+  if (!blockingBody) {
+    return [from, to];
+  }
+
+  const center = blockingBody.center;
+  const fromDir = from.clone().sub(center).normalize();
+  const toDir = to.clone().sub(center).normalize();
+
+  let aroundAxis = fromDir.clone().cross(toDir);
+  if (aroundAxis.lengthSq() < 1e-8) {
+    aroundAxis = fromDir.clone().cross(new THREE.Vector3(0, 1, 0));
+  }
+  if (aroundAxis.lengthSq() < 1e-8) {
+    aroundAxis = fromDir.clone().cross(new THREE.Vector3(0, 0, 1));
+  }
+  aroundAxis.normalize();
+
+  const detourRadius = blockingBody.radius + 0.95;
+  const control1 = center
+    .clone()
+    .add(fromDir.clone().multiplyScalar(detourRadius))
+    .add(aroundAxis.clone().multiplyScalar(detourRadius * 0.42));
+  const control2 = center
+    .clone()
+    .add(toDir.clone().multiplyScalar(detourRadius))
+    .add(aroundAxis.clone().multiplyScalar(detourRadius * 0.42));
+
+  const curve = new THREE.CubicBezierCurve3(from, control1, control2, to);
+  return curve.getPoints(28);
+}
+
+function samplePolylinePoint(points, t) {
+  if (!points || points.length === 0) {
+    return new THREE.Vector3();
+  }
+  if (points.length === 1) {
+    return points[0].clone();
+  }
+
+  const segmentCount = points.length - 1;
+  const scaled = THREE.MathUtils.clamp(t, 0, 1) * segmentCount;
+  const index = Math.min(Math.floor(scaled), segmentCount - 1);
+  const localT = scaled - index;
+  return points[index].clone().lerp(points[index + 1], localT);
 }
 
 function createDynamicRoute() {
@@ -1352,8 +1437,9 @@ function animate() {
     if (!node || !nextNode || !relayBeams[index]) {
       return;
     }
-    fromPosition.copy(node.getWorldPosition());
-    toPosition.copy(nextNode.getWorldPosition());
+    const beamPoints = buildRelayPathPoints(node, nextNode);
+    fromPosition.copy(beamPoints[0]);
+    toPosition.copy(beamPoints[beamPoints.length - 1]);
     if (!Number.isFinite(fromPosition.lengthSq()) || !Number.isFinite(toPosition.lengthSq())) {
       return;
     }
@@ -1362,8 +1448,8 @@ function animate() {
     relayBeams[index].currentNodes = [node, nextNode];
     relayBeams[index].line.visible = true;
     relayBeams[index].marker.visible = true;
-    relayBeams[index].line.geometry.setFromPoints([fromPosition.clone(), toPosition.clone()]);
-    markerPosition.lerpVectors(fromPosition, toPosition, pulse);
+    relayBeams[index].line.geometry.setFromPoints(beamPoints);
+    markerPosition.copy(samplePolylinePoint(beamPoints, pulse));
     relayBeams[index].marker.position.copy(markerPosition);
     relayBeams[index].line.material.opacity = 0.28 + 0.44 * Math.sin((elapsed + index) * 1.4) ** 2;
   });

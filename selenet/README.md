@@ -118,6 +118,7 @@ Po wejciu na http://localhost:5173 masz 4 glowne widoki:
 2. Dispatch
 	 - wysylanie nowych pakietow
 	 - wybierasz source_node, destination_node, priority, payload
+	 - source_node jest ograniczony przez lokalizacje backendu (Earth/Moon/satellite)
 
 3. Graf Statusow
 	 - wizualizacja przejsc statusow i hopow dla wybranych pakietow
@@ -182,6 +183,34 @@ Przyklad uploadu:
 curl -X POST http://localhost:8000/api/nodes \
 	-H 'Content-Type: application/json' \
 	--data-binary @simulations/nodes.multi-window.json
+```
+
+## Konfiguracja lokalizacji wysylki (real-life)
+
+Backend wymusza, z jakich wezlow mozna wysylac nowe pakiety (source_node),
+zaleznie od lokalizacji instancji aplikacji.
+
+Ustaw to w `docker-compose.yml` (service `backend`, sekcja `environment`):
+
+- `DISPATCH_ORIGIN_SCOPE`: `earth` | `moon` | `satellite`
+- `DISPATCH_ORIGIN_NODE_ID`: wymagane tylko gdy `DISPATCH_ORIGIN_SCOPE=satellite`
+
+Przyklady:
+
+- Backend na Ziemi:
+	- `DISPATCH_ORIGIN_SCOPE: earth`
+
+- Backend na Ksiezycu:
+	- `DISPATCH_ORIGIN_SCOPE: moon`
+
+- Backend na konkretnej satelicie:
+	- `DISPATCH_ORIGIN_SCOPE: satellite`
+	- `DISPATCH_ORIGIN_NODE_ID: SAT_1`
+
+Po zmianie tych zmiennych zrestartuj backend:
+
+```bash
+docker compose up -d --build backend
 ```
 
 ## Pozycja satelity - jak jest okreslana teraz
