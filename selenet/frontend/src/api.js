@@ -49,6 +49,10 @@ export function fetchNodes(limit = 200) {
   return request(`/api/nodes?limit=${limit}`);
 }
 
+export function fetchDispatchContext() {
+  return request("/api/packets/dispatch-context");
+}
+
 export function createPacket(packet) {
   return request("/api/packets", {
     method: "POST",

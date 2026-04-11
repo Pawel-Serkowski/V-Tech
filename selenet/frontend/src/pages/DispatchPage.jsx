@@ -6,6 +6,10 @@ import PacketTable from "../components/PacketTable";
 
 export default function DispatchPage({
   onDispatch,
+  nodes,
+  loadingNodes,
+  dispatchContext,
+  loadingDispatchContext,
   packets,
   events,
   loadingPackets,
@@ -22,8 +26,8 @@ export default function DispatchPage({
             </CCardHeader>
             <CCardBody>
               <p className="mb-0 text-body-secondary">
-                Create and submit packet payloads from Earth stations. The route is evaluated immediately and shown in
-                the packet monitor after submission.
+                Create and submit packet payloads from sources allowed by backend location policy.
+                The route is evaluated immediately and shown in the packet monitor after submission.
               </p>
             </CCardBody>
           </CCard>
@@ -32,7 +36,13 @@ export default function DispatchPage({
 
       <CRow className="g-4">
         <CCol xl={7}>
-          <PacketDispatchForm onDispatch={onDispatch} />
+          <PacketDispatchForm
+            onDispatch={onDispatch}
+            nodes={nodes}
+            loadingNodes={loadingNodes}
+            dispatchContext={dispatchContext}
+            loadingDispatchContext={loadingDispatchContext}
+          />
         </CCol>
         <CCol xl={5}>
           <EventFeedPanel events={events} title="Dispatch Event Feed" />

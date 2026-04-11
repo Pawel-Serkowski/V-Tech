@@ -37,6 +37,8 @@ services:
       STATUS_EXCHANGE_NAME: status.updates
       RETRY_SCAN_INTERVAL_SECONDS: 3
       RETRY_BATCH_SIZE: 200
+      DISPATCH_ORIGIN_SCOPE: earth
+      DISPATCH_ORIGIN_NODE_ID: ""
     ports:
       - "8001:8000"
     restart: on-failure
@@ -255,6 +257,116 @@ services:
       PACKET_QUEUE_PREFIX: packets
       NODE_ID: SAT_CANCEL_DST
       NODE_LOCATION: Cancel Flow Destination
+      RABBITMQ_MAX_PRIORITY: 10
+      BACKEND_STATUS_URL: http://backend:8000/api/packets/status
+      BACKEND_PACKETS_URL: http://backend:8000/api/packets
+    restart: on-failure
+    depends_on:
+      - backend
+      - rabbitmq
+      - mongo
+
+  worker_estrack_pl:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: worker
+    container_name: selenet-worker-estrack-pl
+    environment:
+      MONGO_URL: mongodb://mongo:27017
+      MONGO_DB: selenet
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
+      PACKET_QUEUE_PREFIX: packets
+      NODE_ID: ESTRACK_PL
+      NODE_LOCATION: ESTRACK Poland
+      RABBITMQ_MAX_PRIORITY: 10
+      BACKEND_STATUS_URL: http://backend:8000/api/packets/status
+      BACKEND_PACKETS_URL: http://backend:8000/api/packets
+    restart: on-failure
+    depends_on:
+      - backend
+      - rabbitmq
+      - mongo
+
+  worker_gs_cancel_test:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: worker
+    container_name: selenet-worker-gs-cancel-test
+    environment:
+      MONGO_URL: mongodb://mongo:27017
+      MONGO_DB: selenet
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
+      PACKET_QUEUE_PREFIX: packets
+      NODE_ID: GS_CANCEL_TEST
+      NODE_LOCATION: Cancel Test Ground Station
+      RABBITMQ_MAX_PRIORITY: 10
+      BACKEND_STATUS_URL: http://backend:8000/api/packets/status
+      BACKEND_PACKETS_URL: http://backend:8000/api/packets
+    restart: on-failure
+    depends_on:
+      - backend
+      - rabbitmq
+      - mongo
+
+  worker_gs_test:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: worker
+    container_name: selenet-worker-gs-test
+    environment:
+      MONGO_URL: mongodb://mongo:27017
+      MONGO_DB: selenet
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
+      PACKET_QUEUE_PREFIX: packets
+      NODE_ID: GS_TEST
+      NODE_LOCATION: Test Ground Station
+      RABBITMQ_MAX_PRIORITY: 10
+      BACKEND_STATUS_URL: http://backend:8000/api/packets/status
+      BACKEND_PACKETS_URL: http://backend:8000/api/packets
+    restart: on-failure
+    depends_on:
+      - backend
+      - rabbitmq
+      - mongo
+
+  worker_luna_relay_b:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: worker
+    container_name: selenet-worker-luna-relay-b
+    environment:
+      MONGO_URL: mongodb://mongo:27017
+      MONGO_DB: selenet
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
+      PACKET_QUEUE_PREFIX: packets
+      NODE_ID: LUNA_RELAY_B
+      NODE_LOCATION: Luna Relay B
+      RABBITMQ_MAX_PRIORITY: 10
+      BACKEND_STATUS_URL: http://backend:8000/api/packets/status
+      BACKEND_PACKETS_URL: http://backend:8000/api/packets
+    restart: on-failure
+    depends_on:
+      - backend
+      - rabbitmq
+      - mongo
+
+  worker_no_worker_src:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: worker
+    container_name: selenet-worker-no-worker-src
+    environment:
+      MONGO_URL: mongodb://mongo:27017
+      MONGO_DB: selenet
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
+      PACKET_QUEUE_PREFIX: packets
+      NODE_ID: NO_WORKER_SRC
+      NODE_LOCATION: Source Test Node
       RABBITMQ_MAX_PRIORITY: 10
       BACKEND_STATUS_URL: http://backend:8000/api/packets/status
       BACKEND_PACKETS_URL: http://backend:8000/api/packets
