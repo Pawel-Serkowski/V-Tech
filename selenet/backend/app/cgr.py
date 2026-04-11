@@ -1,6 +1,15 @@
-from datetime import datetime
+from datetime import datetime, timezone
 import heapq
 from typing import Any
+
+
+def calculate_delay(source_node: dict[str, Any], destination_node_id: str) -> float:
+    source_type = source_node.get("node_type")
+    if source_type == "ground_station":
+        return 0.5
+    if source_type == "relay":
+        return 1.5
+    return 2.0
 
 def _build_contacts_for_nodes(nodes, current_time, node_map):
     contact_plan = []
@@ -15,7 +24,7 @@ def _build_contacts_for_nodes(nodes, current_time, node_map):
             neighbors = _collect_neighbors(node.get("node_id"), node_map)
             for neighbor in neighbors:
                 contact_plan.append({
-                    "source": window.get("node_id"),
+                    "source": node.get("node_id"),
                     "dest": neighbor,
                     "start": start,
                     "end": end,
@@ -28,10 +37,15 @@ def _build_contacts_for_nodes(nodes, current_time, node_map):
 
 def _to_datetime(value: Any) -> datetime | None:
     if isinstance(value, datetime):
+        if value.tzinfo is None or value.tzinfo.utcoffset(value) is None:
+            return value.replace(tzinfo=timezone.utc)
         return value
     if isinstance(value, str):
         try:
-            return datetime.fromisoformat(value.replace("Z", "+00:00"))
+            parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+            if parsed.tzinfo is None or parsed.tzinfo.utcoffset(parsed) is None:
+                return parsed.replace(tzinfo=timezone.utc)
+            return parsed
         except ValueError:
             return None
     return None
@@ -91,10 +105,14 @@ class CGREngine:
         destination_node: str,
         nodes: list[dict[str, Any]],
         earth_timestamp: datetime,
+        ttl_seconds: int = 3600,
+        hop_limit: int = 10
     ) -> list[str] | None:
         node_map = {node.get("node_id"): node for node in nodes}
         plan = _build_contacts_for_nodes(nodes, earth_timestamp, node_map)
         plan_by_source = {}
+
+        deadline = earth_timestamp.timestamp() + ttl_seconds
 
         for contact in plan:
             contact_source_node = contact["source"]
@@ -111,6 +129,13 @@ class CGREngine:
         priority_queue = [(earth_timestamp.timestamp(), source_node, [])] #czas przybycia, aktualny węzeł, ścieżka
         while priority_queue:
             current_time, current_node, path = heapq.heappop(priority_queue)
+
+            if len(path) >= hop_limit:
+                continue
+        
+            if current_time > deadline:
+                continue
+
             if current_time > earliest_arrival[current_node]: #jeżeli do sprawdzanego węzła już jest gdzies szybsza droga
                 continue
             
@@ -119,6 +144,9 @@ class CGREngine:
             
             for contact in plan_by_source.get(current_node, []):
                 if contact["source"] == current_node:
+                    if contact["dest"] in path:
+                        continue #avoiding loop 
+                
                     #wysyłanie nie wcześniej niż pakiet dotrze i nie wcześniej niż dane okienko będzie dostepne
                     start_send_time = max(current_time, contact["start"].timestamp())
 
@@ -131,21 +159,3 @@ class CGREngine:
                             heapq.heappush(priority_queue, (arrival_time_to_dest, contact["dest"], path + [contact["dest"]]))
 
         return None
-
-
-    @staticmethod
-    def compute_next_hop(
-        source_node: str,
-        destination_node: str,
-        nodes: list[dict[str, Any]],
-        earth_timestamp: datetime,
-    ) -> str | None:
-        route_hops = CGREngine.compute_route_hops(
-            source_node=source_node,
-            destination_node=destination_node,
-            nodes=nodes,
-            earth_timestamp=earth_timestamp,
-        )
-        if not route_hops:
-            return None
-        return route_hops[0]

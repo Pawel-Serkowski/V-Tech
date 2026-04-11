@@ -64,6 +64,8 @@ async def _notify_backend(
     to_node: str | None = None,
     from_location: str | None = None,
     to_location: str | None = None,
+    time_elapsed: float | None = None,
+    ttl_remaining: float | None = None,
 ) -> None:
     payload = {
         "packet_id": packet_id,
@@ -86,6 +88,10 @@ async def _notify_backend(
         payload["from_location"] = from_location
     if to_location is not None:
         payload["to_location"] = to_location
+    if time_elapsed is not None:
+        payload["time_elapsed"] = time_elapsed
+    if ttl_remaining is not None:
+        payload["ttl_remaining"] = ttl_remaining
 
     try:
         await client.post(BACKEND_STATUS_URL, json=payload, timeout=10.0)
@@ -168,6 +174,36 @@ def _as_node_id(value: Any, fallback: str) -> str:
     return fallback
 
 
+def _parse_iso_datetime(value: Any) -> datetime | None:
+    if not isinstance(value, str) or not value.strip():
+        return None
+    try:
+        return datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+
+
+def _ttl_metrics(data: dict[str, Any], now: datetime) -> tuple[float | None, float | None]:
+    earth_ts = _parse_iso_datetime(data.get("earth_timestamp"))
+    expire_at = _parse_iso_datetime(data.get("expire_at"))
+
+    time_elapsed: float | None = None
+    if earth_ts is not None:
+        time_elapsed = max(0.0, (now - earth_ts).total_seconds())
+
+    ttl_remaining: float | None = None
+    if expire_at is not None:
+        ttl_remaining = (expire_at - now).total_seconds()
+    elif time_elapsed is not None:
+        try:
+            ttl_seconds = float(data.get("ttl_seconds"))
+            ttl_remaining = ttl_seconds - time_elapsed
+        except Exception:
+            ttl_remaining = None
+
+    return time_elapsed, ttl_remaining
+
+
 async def _ensure_queue(
     channel: aio_pika.Channel,
     queue_name: str,
@@ -216,7 +252,7 @@ async def _process_message(
         except json.JSONDecodeError:
             print(f"[worker:{NODE_ID}] invalid JSON payload, dropping")
             return
-
+                
         packet_id = data.get("packet_id")
         current_node = _as_node_id(data.get("current_node"), NODE_ID)
         source_node = _as_node_id(data.get("source_node"), NODE_ID)
@@ -235,6 +271,24 @@ async def _process_message(
 
         if not packet_id:
             print(f"[worker:{NODE_ID}] message missing packet_id, dropping")
+            return
+
+        now = datetime.now(timezone.utc)
+        time_elapsed, ttl_remaining = _ttl_metrics(data, now)
+        if ttl_remaining is not None and ttl_remaining <= 0:
+            detail = f"Packet TTL expired in queue at {_node_label(current_node, route_locations)}. Dropping."
+            await _notify_backend(
+                client=client,
+                packet_id=packet_id,
+                status="FAILED_EXPIRED",
+                next_hop=None,
+                detail=detail,
+                node_id=current_node,
+                from_node=current_node,
+                time_elapsed=time_elapsed,
+                ttl_remaining=0.0,
+            )
+            print(f"[worker:{NODE_ID}] packet {packet_id} expired. Dropping.")
             return
 
         if not remaining_hops:
@@ -278,6 +332,8 @@ async def _process_message(
                 to_node=to_node,
                 from_location=from_location,
                 to_location=to_location,
+                time_elapsed=time_elapsed,
+                ttl_remaining=ttl_remaining,
             )
             return
 
@@ -299,9 +355,35 @@ async def _process_message(
             to_node=to_node,
             from_location=from_location,
             to_location=to_location,
+            time_elapsed=time_elapsed,
+            ttl_remaining=ttl_remaining,
         )
 
         await asyncio.sleep(_delay_seconds(message.priority))
+
+        now_after_hop = datetime.now(timezone.utc)
+        time_elapsed_after_hop, ttl_remaining_after_hop = _ttl_metrics(data, now_after_hop)
+        if ttl_remaining_after_hop is not None and ttl_remaining_after_hop <= 0:
+            await _notify_backend(
+                client=client,
+                packet_id=packet_id,
+                status="FAILED_EXPIRED",
+                next_hop=to_node,
+                detail=(
+                    f"Packet TTL expired during hop {hop_index}/{hop_total} before reaching "
+                    f"{_node_label(to_node, route_locations)}."
+                ),
+                node_id=to_node,
+                hop_index=hop_index,
+                hop_total=hop_total,
+                from_node=current_node,
+                to_node=to_node,
+                from_location=from_location,
+                to_location=to_location,
+                time_elapsed=time_elapsed_after_hop,
+                ttl_remaining=0.0,
+            )
+            return
 
         if await _is_cancel_requested(client, packet_id):
             await _notify_backend(
@@ -320,6 +402,8 @@ async def _process_message(
                 to_node=to_node,
                 from_location=from_location,
                 to_location=to_location,
+                time_elapsed=time_elapsed_after_hop,
+                ttl_remaining=ttl_remaining_after_hop,
             )
             return
 
@@ -336,6 +420,9 @@ async def _process_message(
                 "route_hops": route_hops,
                 "route_locations": route_locations,
                 "earth_timestamp": data.get("earth_timestamp"),
+                "ttl_seconds": data.get("ttl_seconds"),
+                "hop_limit": data.get("hop_limit"),
+                "expire_at": data.get("expire_at"),
                 "priority": data.get("priority"),
                 "payload": data.get("payload", {}),
             }
@@ -364,6 +451,8 @@ async def _process_message(
             to_node=to_node,
             from_location=from_location,
             to_location=to_location,
+            time_elapsed=time_elapsed_after_hop,
+            ttl_remaining=ttl_remaining_after_hop,
         )
 
 

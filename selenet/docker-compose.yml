@@ -30,7 +30,6 @@ services:
       RETRY_SCAN_INTERVAL_SECONDS: 3
       RETRY_BATCH_SIZE: 200
     ports:
-      - "8000:8000"
       - "8001:8000"
     restart: on-failure
     depends_on:

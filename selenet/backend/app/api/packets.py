@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query
@@ -68,6 +68,8 @@ async def ingest_packet(packet: PacketCreate) -> PacketAck:
         destination_node=packet.destination_node,
         nodes=nodes,
         earth_timestamp=earth_timestamp,
+        ttl_seconds=packet.ttl_seconds,
+        hop_limit=packet.hop_limit,
     )
     next_hop = route_hops[0] if route_hops else None
     route_locations = _build_route_locations(packet.source_node, route_hops or [], nodes)
@@ -95,6 +97,10 @@ async def ingest_packet(packet: PacketCreate) -> PacketAck:
         "priority": int(packet.priority),
         "payload": packet.payload,
         "earth_timestamp": earth_timestamp,
+        "ttl_seconds":  packet.ttl_seconds,
+        "hop_limit": packet.hop_limit,
+        "expire_at": earth_timestamp + timedelta(seconds=packet.ttl_seconds),
+        "hops_traveled": 0,
         "cancel_requested": False,
         "cancel_requested_at": None,
         "next_hop": next_hop,
@@ -118,6 +124,9 @@ async def ingest_packet(packet: PacketCreate) -> PacketAck:
             "route_hops": route_hops,
             "route_locations": route_locations,
             "earth_timestamp": earth_timestamp.isoformat(),
+            "ttl_seconds": packet.ttl_seconds,
+            "hop_limit": packet.hop_limit,
+            "expire_at": (earth_timestamp + timedelta(seconds=packet.ttl_seconds)).isoformat(),
             "priority": int(packet.priority),
             "payload": packet.payload,
         }
@@ -223,6 +232,10 @@ async def register_status_update(update: PacketStatusUpdate) -> dict[str, Any]:
         set_payload["hop_total"] = update.hop_total
     if update.node_id is not None:
         set_payload["current_node_id"] = update.node_id
+    if update.time_elapsed is not None:
+        set_payload["time_elapsed"] = update.time_elapsed
+    if update.ttl_remaining is not None:
+        set_payload["ttl_remaining"] = update.ttl_remaining
 
     history_row = {
         "status": update.status,
@@ -236,6 +249,8 @@ async def register_status_update(update: PacketStatusUpdate) -> dict[str, Any]:
         "to_node": update.to_node,
         "from_location": update.from_location,
         "to_location": update.to_location,
+        "time_elapsed": update.time_elapsed,
+        "ttl_remaining": update.ttl_remaining,
     }
 
     result = await db.packets.update_one(
@@ -263,6 +278,8 @@ async def register_status_update(update: PacketStatusUpdate) -> dict[str, Any]:
             "to_node": update.to_node,
             "from_location": update.from_location,
             "to_location": update.to_location,
+            "time_elapsed": update.time_elapsed,
+            "ttl_remaining": update.ttl_remaining,
             "at": update.at.isoformat(),
         }
     )

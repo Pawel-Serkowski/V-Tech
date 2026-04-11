@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import IntEnum
 from typing import Any, Literal
 
@@ -11,6 +11,7 @@ class PacketPriority(IntEnum):
     BULK = 3
 
     @property
+    # w rabbit piority jest od 10 do 0, a w aplikacji dla przejrzystości od 1 do 3
     def rabbit_priority(self) -> int:
         mapping = {
             PacketPriority.CRITICAL: 10,
@@ -26,6 +27,14 @@ class ContactWindow(BaseModel):
 
     @model_validator(mode="after")
     def validate_window_order(self) -> "ContactWindow":
+        if self.start.tzinfo is None or self.start.tzinfo.utcoffset(self.start) is None:
+            raise ValueError("Contact window start must include timezone information.")
+        if self.end.tzinfo is None or self.end.tzinfo.utcoffset(self.end) is None:
+            raise ValueError("Contact window end must include timezone information.")
+
+        self.start = self.start.astimezone(timezone.utc)
+        self.end = self.end.astimezone(timezone.utc)
+
         if self.start >= self.end:
             raise ValueError("Contact window start must be before end.")
         return self
@@ -65,6 +74,8 @@ class PacketCreate(BaseModel):
     destination_node: str = Field(min_length=1)
     payload: dict[str, Any]
     priority: PacketPriority = PacketPriority.BULK
+    ttl_seconds: int = Field(default=3600, ge=60, le=86400)
+    hop_limit: int = Field(default=10, ge=2, le=50)
 
     @field_validator("source_node", "destination_node")
     @classmethod
@@ -96,6 +107,8 @@ class PacketStatusUpdate(BaseModel):
     to_node: str | None = None
     from_location: str | None = None
     to_location: str | None = None
+    time_elapsed: float | None = None
+    ttl_remaining: float | None = None
 
 
 class PacketSummary(BaseModel):
