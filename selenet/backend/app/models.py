@@ -45,6 +45,9 @@ class NodeConfig(BaseModel):
     node_type: Literal["ground_station", "satellite", "relay"] = "satellite"
     orbit: str | None = None
     location_label: str | None = None
+    position_x_km: float | None = None
+    position_y_km: float | None = None
+    position_z_km: float | None = None
     time_offset_seconds: int = 0
     contact_windows: list[ContactWindow] = Field(default_factory=list)
     links: list[str] = Field(default_factory=list)
@@ -62,6 +65,15 @@ class NodeConfig(BaseModel):
             cleaned_links.append(node_id)
 
         self.links = cleaned_links
+
+        coordinates = [self.position_x_km, self.position_y_km, self.position_z_km]
+        provided_coordinates = sum(value is not None for value in coordinates)
+        if provided_coordinates not in (0, 3):
+            raise ValueError(
+                "Node position must define all three Cartesian coordinates: "
+                "position_x_km, position_y_km, position_z_km."
+            )
+
         return self
 
 
