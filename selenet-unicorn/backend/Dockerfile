@@ -18,4 +18,4 @@ CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
 
 FROM base AS worker
 
-CMD ["python", "worker/worker.py"]
+CMD ["python", "-m", "worker.worker"]

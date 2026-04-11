@@ -232,8 +232,11 @@ async def _publish_envelope(
 
 
 async def _sleep_for_hop(delay_seconds: float) -> None:
+    # Base physics delay
     scaled_delay = max(0.01, min(5.0, delay_seconds * SIMULATION_TIME_SCALE))
-    await asyncio.sleep(scaled_delay)
+    # 'Tryb symulacji': artificial 4-second delay per hop so the UI has time to draw beams and the user can see it step by step
+    simulation_mode_delay = 4.0
+    await asyncio.sleep(scaled_delay + simulation_mode_delay)
 
 
 async def _process_message(
@@ -496,21 +499,25 @@ async def _consume_forever() -> None:
     await channel.set_qos(prefetch_count=1)
 
     declared_queues: set[str] = set()
-    await _ensure_queue(channel, MY_QUEUE, declared_queues)
-    queue = await channel.get_queue(MY_QUEUE)
-
-    if NODE_LOCATION:
-        print(f"[worker:{NODE_ID}] location={NODE_LOCATION}; queue={MY_QUEUE}")
-    else:
-        print(f"[worker:{NODE_ID}] queue={MY_QUEUE}")
+    node_ids = [n.strip() for n in NODE_ID.split(",") if n.strip()]
 
     async with httpx.AsyncClient() as client:
         async def on_message(message: aio_pika.IncomingMessage) -> None:
             await _process_message(message, channel, declared_queues, client)
 
-        await queue.consume(on_message)
-        await asyncio.Future()
+        for nid in node_ids:
+            queue_name = f"{PACKET_QUEUE_PREFIX}.{nid}"
+            await _ensure_queue(channel, queue_name, declared_queues)
+            queue = await channel.get_queue(queue_name)
+            
+            if NODE_LOCATION:
+                print(f"[worker:{nid}] location={NODE_LOCATION}; queue={queue_name}")
+            else:
+                print(f"[worker:{nid}] queue={queue_name}")
 
+            await queue.consume(on_message)
+
+        await asyncio.Future()
 
 async def main() -> None:
     while True:

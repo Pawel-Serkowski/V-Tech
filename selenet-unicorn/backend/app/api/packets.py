@@ -210,16 +210,6 @@ async def list_packets(limit: int = Query(default=100, ge=1, le=1000)) -> list[P
     return [PacketSummary.model_validate(_serialize_packet(row)) for row in rows]
 
 
-@router.get("/{packet_id}", response_model=PacketSummary)
-async def get_packet(packet_id: str) -> PacketSummary:
-    db = get_database()
-    row = await db.packets.find_one({"packet_id": packet_id})
-    if row is None:
-        raise HTTPException(status_code=404, detail="Packet not found.")
-
-    return PacketSummary.model_validate(_serialize_packet(row))
-
-
 @router.get("/queue-load", response_model=list[QueueLoadItem])
 async def queue_load() -> list[QueueLoadItem]:
     db = get_database()
@@ -252,6 +242,16 @@ async def queue_load() -> list[QueueLoadItem]:
         QueueLoadItem(node_id=item["_id"], queued_packets=item["queued_packets"])
         for item in records
     ]
+
+
+@router.get("/{packet_id}", response_model=PacketSummary)
+async def get_packet(packet_id: str) -> PacketSummary:
+    db = get_database()
+    row = await db.packets.find_one({"packet_id": packet_id})
+    if row is None:
+        raise HTTPException(status_code=404, detail="Packet not found.")
+
+    return PacketSummary.model_validate(_serialize_packet(row))
 
 
 @router.post("/status", status_code=202)
