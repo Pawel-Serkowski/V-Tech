@@ -6,6 +6,7 @@ services:
       context: .
       dockerfile: Dockerfile
       target: frontend
+    command: sh -c "npm install && npm run dev -- --host 0.0.0.0 --port 5173"
     container_name: selenet-frontend
     environment:
       VITE_API_BASE_URL: http://localhost:8001
@@ -100,6 +101,160 @@ services:
       PACKET_QUEUE_PREFIX: packets
       NODE_ID: SAT_2
       NODE_LOCATION: Lunar Far Side Relay
+      RABBITMQ_MAX_PRIORITY: 10
+      BACKEND_STATUS_URL: http://backend:8000/api/packets/status
+      BACKEND_PACKETS_URL: http://backend:8000/api/packets
+    restart: on-failure
+    depends_on:
+      - backend
+      - rabbitmq
+      - mongo
+
+  worker_luna_orbiter_a:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: worker
+    container_name: selenet-worker-luna-orbiter-a
+    environment:
+      MONGO_URL: mongodb://mongo:27017
+      MONGO_DB: selenet
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
+      PACKET_QUEUE_PREFIX: packets
+      NODE_ID: LUNA_ORBITER_A
+      NODE_LOCATION: NRHO Orbiter A
+      RABBITMQ_MAX_PRIORITY: 10
+      BACKEND_STATUS_URL: http://backend:8000/api/packets/status
+      BACKEND_PACKETS_URL: http://backend:8000/api/packets
+    restart: on-failure
+    depends_on:
+      - backend
+      - rabbitmq
+      - mongo
+
+  worker_sat_r1:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: worker
+    container_name: selenet-worker-sat-r1
+    environment:
+      MONGO_URL: mongodb://mongo:27017
+      MONGO_DB: selenet
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
+      PACKET_QUEUE_PREFIX: packets
+      NODE_ID: SAT_R1
+      NODE_LOCATION: Lunar Relay 1
+      RABBITMQ_MAX_PRIORITY: 10
+      BACKEND_STATUS_URL: http://backend:8000/api/packets/status
+      BACKEND_PACKETS_URL: http://backend:8000/api/packets
+    restart: on-failure
+    depends_on:
+      - backend
+      - rabbitmq
+      - mongo
+
+  worker_sat_r2:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: worker
+    container_name: selenet-worker-sat-r2
+    environment:
+      MONGO_URL: mongodb://mongo:27017
+      MONGO_DB: selenet
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
+      PACKET_QUEUE_PREFIX: packets
+      NODE_ID: SAT_R2
+      NODE_LOCATION: Lunar Relay 2
+      RABBITMQ_MAX_PRIORITY: 10
+      BACKEND_STATUS_URL: http://backend:8000/api/packets/status
+      BACKEND_PACKETS_URL: http://backend:8000/api/packets
+    restart: on-failure
+    depends_on:
+      - backend
+      - rabbitmq
+      - mongo
+
+  worker_sat_dst:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: worker
+    container_name: selenet-worker-sat-dst
+    environment:
+      MONGO_URL: mongodb://mongo:27017
+      MONGO_DB: selenet
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
+      PACKET_QUEUE_PREFIX: packets
+      NODE_ID: SAT_DST
+      NODE_LOCATION: Destination Orbit Node
+      RABBITMQ_MAX_PRIORITY: 10
+      BACKEND_STATUS_URL: http://backend:8000/api/packets/status
+      BACKEND_PACKETS_URL: http://backend:8000/api/packets
+    restart: on-failure
+    depends_on:
+      - backend
+      - rabbitmq
+      - mongo
+
+  worker_sat_cancel_r1:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: worker
+    container_name: selenet-worker-sat-cancel-r1
+    environment:
+      MONGO_URL: mongodb://mongo:27017
+      MONGO_DB: selenet
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
+      PACKET_QUEUE_PREFIX: packets
+      NODE_ID: SAT_CANCEL_R1
+      NODE_LOCATION: Cancel Flow Relay 1
+      RABBITMQ_MAX_PRIORITY: 10
+      BACKEND_STATUS_URL: http://backend:8000/api/packets/status
+      BACKEND_PACKETS_URL: http://backend:8000/api/packets
+    restart: on-failure
+    depends_on:
+      - backend
+      - rabbitmq
+      - mongo
+
+  worker_sat_cancel_r2:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: worker
+    container_name: selenet-worker-sat-cancel-r2
+    environment:
+      MONGO_URL: mongodb://mongo:27017
+      MONGO_DB: selenet
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
+      PACKET_QUEUE_PREFIX: packets
+      NODE_ID: SAT_CANCEL_R2
+      NODE_LOCATION: Cancel Flow Relay 2
+      RABBITMQ_MAX_PRIORITY: 10
+      BACKEND_STATUS_URL: http://backend:8000/api/packets/status
+      BACKEND_PACKETS_URL: http://backend:8000/api/packets
+    restart: on-failure
+    depends_on:
+      - backend
+      - rabbitmq
+      - mongo
+
+  worker_sat_cancel_dst:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: worker
+    container_name: selenet-worker-sat-cancel-dst
+    environment:
+      MONGO_URL: mongodb://mongo:27017
+      MONGO_DB: selenet
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
+      PACKET_QUEUE_PREFIX: packets
+      NODE_ID: SAT_CANCEL_DST
+      NODE_LOCATION: Cancel Flow Destination
       RABBITMQ_MAX_PRIORITY: 10
       BACKEND_STATUS_URL: http://backend:8000/api/packets/status
       BACKEND_PACKETS_URL: http://backend:8000/api/packets

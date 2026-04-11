@@ -508,10 +508,13 @@ export default function ObjectsPage({ nodes, loadingNodes, onSaveNodes, onRefres
     clearFeedback();
 
     try {
-      const result = await onSaveNodes(draftNodes);
+      const result = await onSaveNodes(draftNodes, { replace: true });
       setDraftNodes([]);
       await onRefreshNodes();
-      setLocalMessage(`Szkic zapisany. Dodane: ${result.inserted}, zaktualizowane: ${result.updated}.`);
+      const deleted = Number.isFinite(result.deleted) ? result.deleted : 0;
+      setLocalMessage(
+        `Szkic zastapil konfiguracje. Dodane: ${result.inserted}, zaktualizowane: ${result.updated}, usuniete: ${deleted}.`
+      );
     } catch (error) {
       setLocalError(error.message);
     } finally {
@@ -691,7 +694,7 @@ export default function ObjectsPage({ nodes, loadingNodes, onSaveNodes, onRefres
 
                   <div className="d-flex flex-wrap gap-2">
                     <CButton color="success" onClick={saveDraft} disabled={savingDraft}>
-                      {savingDraft ? "Zapisywanie..." : "Zapisz caly szkic"}
+                      {savingDraft ? "Zapisywanie..." : "Zapisz i zastap konfiguracje"}
                     </CButton>
                     <CButton color="secondary" variant="outline" onClick={clearDraft} disabled={savingDraft}>
                       Wyczysc szkic

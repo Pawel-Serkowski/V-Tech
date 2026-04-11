@@ -5,7 +5,7 @@ set -euo pipefail
 API_BASE_URL="${API_BASE_URL:-http://localhost:8001}"
 
 echo "[1/5] Uploading CLOSED windows so packet starts in WAITING_RETRY..."
-curl -sS -X POST "${API_BASE_URL}/api/nodes" \
+curl -sS -X POST "${API_BASE_URL}/api/nodes?replace=true" \
   -H 'Content-Type: application/json' \
   -d '{
     "nodes": [
@@ -52,7 +52,7 @@ echo "Packet ID: ${PACKET_ID}"
 
 echo
 echo "[3/5] Opening windows to trigger automatic retry engine..."
-curl -sS -X POST "${API_BASE_URL}/api/nodes" \
+curl -sS -X POST "${API_BASE_URL}/api/nodes?replace=true" \
   -H 'Content-Type: application/json' \
   -d '{
     "nodes": [

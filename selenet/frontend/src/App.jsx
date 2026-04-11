@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { Suspense, lazy, useCallback, useEffect, useMemo, useState } from "react";
 import { NavLink, Navigate, Route, Routes } from "react-router-dom";
 
 import {
@@ -24,6 +24,8 @@ import DispatchPage from "./pages/DispatchPage";
 import MonitoringPage from "./pages/MonitoringPage";
 import ObjectsPage from "./pages/ObjectsPage";
 import PacketStatusGraphPage from "./pages/PacketStatusGraphPage";
+
+const VisualizationPage = lazy(() => import("./pages/VisualizationPage"));
 
 function navLinkClassName({ isActive }) {
   return isActive ? "app-nav-link active" : "app-nav-link";
@@ -180,13 +182,15 @@ export default function App() {
     }
   }, [refreshTelemetry]);
 
-  const handleSaveNodes = async (payloadNodes) => {
+  const handleSaveNodes = async (payloadNodes, options = {}) => {
     setError("");
     setMessage("");
 
     try {
-      const result = await uploadNodesJson(payloadNodes);
-      setMessage(`Node update applied. Inserted: ${result.inserted}, Updated: ${result.updated}.`);
+      const result = await uploadNodesJson(payloadNodes, options);
+      const deleted = Number.isFinite(result.deleted) ? result.deleted : 0;
+      const summary = options.replace ? "Node configuration replaced." : "Node update applied.";
+      setMessage(`${summary} Inserted: ${result.inserted}, Updated: ${result.updated}, Deleted: ${deleted}.`);
       await handleRefreshNodes();
       return result;
     } catch (err) {
@@ -241,6 +245,9 @@ export default function App() {
                 </NavLink>
                 <NavLink className={navLinkClassName} to="/objects">
                   Objects
+                </NavLink>
+                <NavLink className={navLinkClassName} to="/visualization">
+                  Visualization
                 </NavLink>
               </div>
             </CCard>
@@ -302,6 +309,17 @@ export default function App() {
                 onSaveNodes={handleSaveNodes}
                 onRefreshNodes={handleRefreshNodes}
               />
+            )}
+          />
+          <Route
+            path="/visualization"
+            element={(
+              <Suspense fallback={<div className="px-2 py-4 text-body-secondary">Loading visualization...</div>}>
+                <VisualizationPage
+                  packets={packets}
+                  nodes={nodes}
+                />
+              </Suspense>
             )}
           />
           <Route path="*" element={<Navigate to="/" replace />} />

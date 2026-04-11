@@ -17,7 +17,7 @@ if ! [[ "${POLL_SECONDS}" =~ ^[0-9]+$ ]]; then
 fi
 
 echo "[1/6] Uploading deterministic multi-hop node config..."
-curl -sS -X POST "${API_BASE_URL}/api/nodes" \
+curl -sS -X POST "${API_BASE_URL}/api/nodes?replace=true" \
   -H 'Content-Type: application/json' \
   -d '{
     "nodes": [
@@ -49,7 +49,7 @@ curl -sS -X POST "${API_BASE_URL}/api/nodes" \
         "orbit": "Relay 2",
         "time_offset_seconds": 0,
         "location_label": "Lunar Far Side Relay",
-        "links": ["LUNAR_GATEWAY"],
+        "links": ["SAT_1", "LUNAR_GATEWAY"],
         "contact_windows": [
           {"start": "2026-01-01T00:00:00Z", "end": "2027-01-01T00:00:00Z"}
         ]
